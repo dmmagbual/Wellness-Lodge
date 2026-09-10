@@ -19,4 +19,10 @@ export default defineConfig({
   server: {
     port: 5174,
   },
+  // See website/vite.config.ts for why this is needed: @wellness-lodge/shared
+  // is a file:-linked package whose real path is outside node_modules, so
+  // Vite must be told to pre-bundle it or named imports fail at dev time.
+  optimizeDeps: {
+    include: ["@wellness-lodge/shared"],
+  },
 });
