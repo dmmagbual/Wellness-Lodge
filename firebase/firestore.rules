@@ -1,0 +1,141 @@
+rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// Wellness Lodge — Firestore security rules
+//
+// Core principle (from the approved architecture): availability, pricing and
+// booking-state changes happen ONLY through Cloud Functions running with the
+// Admin SDK — never through a direct client write. Firestore rules therefore
+// DENY client writes to every collection that affects money or inventory
+// (bookings, paymentReceipts, inventory, auditLog, ratePeriods changes to
+// booking-affecting fields). Cloud Functions bypass these rules entirely
+// (Admin SDK), so this is not a limitation on the app — it is the control
+// that makes "no direct-write double booking" enforceable.
+// ---------------------------------------------------------------------------
+
+function isSignedIn() {
+  return request.auth != null;
+}
+
+function staffDoc() {
+  return get(/databases/$(database)/documents/users/$(request.auth.uid));
+}
+
+function isActiveStaff() {
+  return isSignedIn() && staffDoc().data.active == true;
+}
+
+function hasRole(roles) {
+  return isActiveStaff() && staffDoc().data.role in roles;
+}
+
+function isAdmin() {
+  return hasRole(['ADMINISTRATOR']);
+}
+
+function isManagerUp() {
+  return hasRole(['ADMINISTRATOR', 'MANAGER']);
+}
+
+function isContentEditor() {
+  return hasRole(['ADMINISTRATOR', 'MANAGER', 'CONTENT_ADMIN']);
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Staff directory -------------------------------------------------
+    match /users/{uid} {
+      allow read: if isActiveStaff();
+      allow write: if isAdmin();
+    }
+
+    // ---- Public catalogue (rooms, rates, services) ------------------------
+    // Publicly readable so the guest-facing website can render without auth.
+    // Only content editors / admins may write, and only via the app's admin
+    // screens (never anonymously).
+    match /roomCategories/{id} {
+      allow read: if true;
+      allow write: if isContentEditor();
+    }
+    match /rooms/{id} {
+      allow read: if true;
+      allow write: if isContentEditor();
+    }
+    match /ratePeriods/{id} {
+      allow read: if true;
+      // Rate changes are commercially sensitive: require Manager or Admin,
+      // never a plain content editor.
+      allow write: if isManagerUp();
+    }
+    match /carRentalVehicles/{id} {
+      allow read: if true;
+      allow write: if isContentEditor();
+    }
+    match /functionHallPackages/{id} {
+      allow read: if true;
+      allow write: if isContentEditor();
+    }
+    match /menuItems/{id} {
+      allow read: if true;
+      allow write: if isContentEditor();
+    }
+    match /pastEvents/{id} {
+      // Only approved events are meant for the public gallery; the website
+      // client query filters approved==true, unapproved docs are still
+      // technically readable — acceptable for a marketing gallery with no
+      // sensitive data, but keep write restricted to content editors.
+      allow read: if true;
+      allow write: if isContentEditor();
+    }
+
+    // ---- Settings ----------------------------------------------------------
+    // "public" doc holds bank details / contact info shown to guests during
+    // and after checkout (the architecture doc requires guests see bank
+    // details without logging in). Treat as public-by-design, not a leak.
+    match /settings/public {
+      allow read: if true;
+      allow write: if isManagerUp();
+    }
+    match /settings/{doc} {
+      allow read: if isActiveStaff();
+      allow write: if isManagerUp();
+    }
+
+    // ---- Bookings — the reservation ledger ---------------------------------
+    // No direct client writes, ever. Guests create/read bookings only via
+    // callable Cloud Functions (createBooking, lookupBooking). Staff read the
+    // live collection directly for the real-time front-desk queue.
+    match /bookings/{id} {
+      allow read: if isActiveStaff();
+      allow write: if false;
+    }
+
+    // ---- Payment receipts ---------------------------------------------------
+    match /paymentReceipts/{id} {
+      allow read: if isActiveStaff();
+      allow write: if false; // written by submitReceipt / verifyPayment functions
+    }
+
+    // ---- Nightly inventory counters -----------------------------------------
+    match /inventory/{categoryId}/nights/{date} {
+      allow read: if isActiveStaff();
+      allow write: if false; // maintained only inside booking transactions
+    }
+
+    // ---- Audit log ------------------------------------------------------------
+    match /auditLog/{id} {
+      allow read: if isManagerUp();
+      allow write: if false; // written by functions only
+    }
+
+    // ---- Guest enquiries (car rental / function hall / restaurant / general) --
+    match /enquiries/{id} {
+      allow create: if request.resource.data.keys().hasOnly(
+        ['type', 'name', 'email', 'phone', 'preferredDate', 'message', 'status', 'createdAt']
+      ) && request.resource.data.status == 'NEW';
+      allow read, update: if isActiveStaff();
+      allow delete: if isAdmin();
+    }
+  }
+}

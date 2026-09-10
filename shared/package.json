@@ -1,0 +1,16 @@
+{
+  "name": "@wellness-lodge/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared types, money/date helpers and the pricing engine used by the Cloud Functions, website and front desk app. Single source of truth for the booking domain model.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "test": "npm run build && node --test test/"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

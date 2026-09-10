@@ -1,0 +1,24 @@
+{
+  "name": "wellness-lodge-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wellness Lodge booking engine — Cloud Functions (availability locking, payment verification, hold expiry, staff administration).",
+  "main": "lib/index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json --watch",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth,storage",
+    "deploy": "npm run build && firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "@wellness-lodge/shared": "file:../../shared",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

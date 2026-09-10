@@ -1,0 +1,12 @@
+{
+  "name": "wellness-lodge-seed",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Seeds the Firebase emulators with sample rooms, rates, services, settings and a demo staff account for local development and client demos. All content is clearly-marked SAMPLE — see docs/CONTENT_CHECKLIST_STATUS.md for what the lodge still needs to supply before launch.",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

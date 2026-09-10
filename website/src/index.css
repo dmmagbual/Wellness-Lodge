@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* Wellness Lodge brand palette: emerald (primary) on a warm stone neutral —
+   matches the tone approved in the earlier prototype. */
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+::selection {
+  background: #047857;
+  color: #fff;
+}

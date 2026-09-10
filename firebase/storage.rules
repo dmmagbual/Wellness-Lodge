@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// Wellness Lodge — Storage security rules
+//
+// Two zones:
+//  - media/**            public property photos (rooms, hall, vehicles, past
+//                         events) — public read, staff write.
+//  - receipts/{bookingRef}/**   bank-transfer proof-of-payment uploads —
+//                         guests may CREATE (upload) only against a booking
+//                         reference that exists and is awaiting a receipt;
+//                         nobody but active staff may ever read them back.
+// ---------------------------------------------------------------------------
+
+function isActiveStaff() {
+  return request.auth != null &&
+    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.active == true;
+}
+
+function bookingAwaitingReceipt(bookingRef) {
+  let b = firestore.get(/databases/(default)/documents/bookings/$(bookingRef));
+  return b.data.status in ['AWAITING_RECEIPT', 'AWAITING_FRONT_DESK'];
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /media/{allPaths=**} {
+      allow read: if true;
+      allow write: if isActiveStaff();
+    }
+
+    match /receipts/{bookingId}/{fileName} {
+      allow read: if isActiveStaff();
+      allow create: if bookingAwaitingReceipt(bookingId)
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/jpeg|image/png|application/pdf');
+      allow update, delete: if isActiveStaff();
+    }
+  }
+}

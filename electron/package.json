@@ -1,0 +1,51 @@
+{
+  "name": "wellness-lodge-front-desk",
+  "productName": "Wellness Lodge Front Desk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wellness Lodge front desk & administration app — live reservation queue, payment verification, calendar and admin console. Installs as a Windows desktop application.",
+  "main": "main.js",
+  "author": "4J Innovation Limited",
+  "scripts": {
+    "dev:renderer": "npm --prefix renderer run dev",
+    "build:renderer": "npm --prefix renderer run build",
+    "start": "npm run build:renderer && electron .",
+    "dist:win": "npm run build:renderer && electron-builder --win --x64",
+    "dist:linux": "npm run build:renderer && electron-builder --linux --x64",
+    "postinstall": "npm --prefix renderer install"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "pg.com.wellnesslodge.frontdesk",
+    "productName": "Wellness Lodge Front Desk",
+    "publish": null,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "WellnessLodgeFrontDesk-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Wellness Lodge Front Desk"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
+  }
+}
