@@ -9,6 +9,7 @@ import Rooms from "./pages/Rooms";
 import Book from "./pages/Book";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import BookingLookup from "./pages/BookingLookup";
+import Services from "./pages/Services";
 import CarRental from "./pages/CarRental";
 import FunctionHall from "./pages/FunctionHall";
 import RestaurantCafe from "./pages/RestaurantCafe";
@@ -25,6 +26,7 @@ createRoot(document.getElementById("root")!).render(
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="rooms" element={<Rooms />} />
+          <Route path="services" element={<Services />} />
           <Route path="book" element={<Book />} />
           <Route path="booking-confirmation/:ref" element={<BookingConfirmation />} />
           <Route path="booking-lookup" element={<BookingLookup />} />
