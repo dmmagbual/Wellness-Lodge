@@ -5,6 +5,7 @@ node_modules/
 dist/
 release/
 firebase/functions/lib/
+firebase/hosting-dist/
 
 # Environment files with local/real config -- keep only .env.example in git
 .env

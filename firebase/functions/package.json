@@ -4,7 +4,9 @@
   "private": true,
   "description": "Wellness Lodge booking engine — Cloud Functions (availability locking, payment verification, hold expiry, staff administration).",
   "main": "lib/index.js",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",

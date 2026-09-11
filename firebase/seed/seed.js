@@ -1,30 +1,75 @@
 /**
- * Seeds the Firebase EMULATORS ONLY (guarded below) with sample content so
- * the website and front desk app have something real to show in local
- * development and client demos.
+ * Seeds sample content so the website and front desk app have something
+ * real to show in local development and client demos.
  *
  * Every business fact here (room names, rates, bank details, contact info)
  * is a SAMPLE placeholder pending the lodge's completed content checklist
- * (Final Client Submission Package, doc 03). Nothing here should reach a
- * production Firebase project — this script refuses to run unless
- * FIRESTORE_EMULATOR_HOST is set, precisely to prevent that mistake.
+ * (Final Client Submission Package, doc 03).
  *
- * Run: npm run seed   (from firebase/seed, with emulators already running)
+ * TWO MODES, both explicit -- there is no implicit/default target:
+ *
+ *  1. Emulator (default local dev): start the emulator suite, then
+ *       FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 npm --prefix seed run seed
+ *
+ *  2. Real Firebase project (used once, deliberately, to give the client a
+ *     working demo before their real content checklist is filled in):
+ *       SEED_PRODUCTION=yes PROJECT_ID=wellness-lodge npm --prefix seed run seed -- --confirm=wellness-lodge
+ *     Requires:
+ *       - gcloud auth application-default login (as an account with access
+ *         to that Firebase project) run once beforehand.
+ *       - --confirm=<PROJECT_ID> to match PROJECT_ID exactly, so a copy-paste
+ *         mistake can't silently target the wrong project.
+ *       - The target's roomCategories collection to be empty. If it already
+ *         has documents (i.e. this was seeded before, or the client's real
+ *         content already went in), the script refuses and prints what it
+ *         found -- pass --force to overwrite anyway, but that will clobber
+ *         whatever is currently live, sample or real, so only do that
+ *         knowingly.
+ *     Nothing else (no env var, no missing flag) will make this script touch
+ *     a real project -- that is intentional, to prevent ever seeding sample
+ *     data over real guest/financial data by accident.
  */
 const admin = require("firebase-admin");
 
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
+const args = process.argv.slice(2);
+const confirmArg = args.find((a) => a.startsWith("--confirm="))?.split("=")[1];
+const force = args.includes("--force");
+
+const usingEmulator = !!process.env.FIRESTORE_EMULATOR_HOST;
+const seedingProduction = process.env.SEED_PRODUCTION === "yes";
+
+let projectId;
+if (usingEmulator) {
+  projectId = "wellness-lodge-demo";
+  admin.initializeApp({ projectId });
+} else if (seedingProduction) {
+  projectId = process.env.PROJECT_ID;
+  if (!projectId) {
+    console.error("Refusing to run: SEED_PRODUCTION=yes requires PROJECT_ID to also be set.");
+    process.exit(1);
+  }
+  if (confirmArg !== projectId) {
+    console.error(
+      `Refusing to run: pass --confirm=${projectId} to explicitly confirm the target project (got ${
+        confirmArg ? `--confirm=${confirmArg}` : "no --confirm flag"
+      }).`
+    );
+    process.exit(1);
+  }
+  console.log(`Seeding REAL Firebase project "${projectId}" with SAMPLE placeholder content.`);
+  admin.initializeApp({ projectId, credential: admin.credential.applicationDefault() });
+} else {
   console.error(
-    "Refusing to run: FIRESTORE_EMULATOR_HOST is not set.\n" +
-      "This script only seeds the local emulator suite. Start it first:\n" +
+    "Refusing to run: neither FIRESTORE_EMULATOR_HOST nor SEED_PRODUCTION=yes is set.\n" +
+      "For local dev, start the emulator suite first:\n" +
       "  cd firebase && firebase emulators:start\n" +
       "then in another terminal:\n" +
-      "  FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 npm --prefix seed run seed"
+      "  FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 npm --prefix seed run seed\n" +
+      "To seed a real Firebase project instead, see the comment at the top of this file."
   );
   process.exit(1);
 }
 
-admin.initializeApp({ projectId: "wellness-lodge-demo" });
 const db = admin.firestore();
 const auth = admin.auth();
 
@@ -241,7 +286,23 @@ const DEMO_STAFF = [
   { email: "frontdesk@wellnesslodge.demo", name: "Demo Front Desk", role: "FRONT_DESK", password: "Demo!Pass123" },
 ];
 
+async function preflightGuard() {
+  if (!seedingProduction || force) return;
+  const existing = await db.collection("roomCategories").limit(5).get();
+  if (!existing.empty) {
+    console.error(
+      `Refusing to run: project "${projectId}" already has ${existing.size >= 5 ? "5+" : existing.size} ` +
+        `document(s) in roomCategories (e.g. "${existing.docs[0].id}"). This script will not overwrite ` +
+        "existing catalogue data -- sample or the client's real content -- without --force.\n" +
+        "Pass --force only if you are certain you want to overwrite what's currently live."
+    );
+    process.exit(1);
+  }
+}
+
 async function run() {
+  await preflightGuard();
+
   console.log("Seeding room categories, rates and rooms...");
   for (const c of CATEGORIES) {
     const { rate, extraAdult, child, ...category } = c;
