@@ -1,7 +1,15 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 /* Wellness Lodge brand palette: emerald (primary) on a warm stone neutral —
-   matches the tone approved in the earlier prototype. */
+   matches the tone approved in the earlier prototype. Playfair Display is
+   the elegant serif for display headings and quotes; Inter carries body/UI
+   text. Both loaded above via Google Fonts. */
+@theme {
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
 :root {
   color-scheme: light;
 }
@@ -12,9 +20,7 @@ html {
 
 body {
   margin: 0;
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
 }
 
 ::selection {
