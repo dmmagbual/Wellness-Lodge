@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { fetchRoomCategories, fetchRatePeriods, fetchSettings } from "@/lib/data";
 import { callCheckAvailability, callCreateBooking } from "@/lib/firebase";
 import {
@@ -26,14 +26,22 @@ export default function Book() {
   const [settings, setSettings] = useState<Partial<LodgeSettings> | null>(null);
 
   const [categoryId, setCategoryId] = useState(params.get("category") ?? "");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
+  const [checkIn, setCheckIn] = useState(params.get("checkIn") ?? "");
+  const [checkOut, setCheckOut] = useState(params.get("checkOut") ?? "");
+  const [adults, setAdults] = useState(() => {
+    const n = parseInt(params.get("adults") ?? "2", 10);
+    return Number.isFinite(n) && n > 0 ? n : 2;
+  });
+  const [children, setChildren] = useState(() => {
+    const n = parseInt(params.get("children") ?? "0", 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  });
 
   const [availability, setAvailability] = useState<{ available: boolean; remaining: number } | null>(null);
   const [checking, setChecking] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [autoChecked, setAutoChecked] = useState(false);
+  const cameFromSearch = Boolean(params.get("category") && params.get("checkIn") && params.get("checkOut"));
 
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -99,6 +107,17 @@ export default function Book() {
     }
   }
 
+  // Coming from the Rooms & Rates search: dates/room/occupancy are already
+  // chosen, so skip straight to an availability check instead of making the
+  // guest re-enter what they just searched for.
+  useEffect(() => {
+    if (!cameFromSearch || autoChecked || checking) return;
+    if (!category || !checkIn || !checkOut || checkOut <= checkIn) return;
+    setAutoChecked(true);
+    handleCheckAvailability();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameFromSearch, autoChecked, checking, category, checkIn, checkOut]);
+
   async function handleSubmitBooking() {
     if (!category) return;
     setSubmitting(true);
@@ -137,6 +156,14 @@ export default function Book() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <SectionHeading eyebrow="Reserve" title="Book Your Stay" />
+
+      {cameFromSearch && (
+        <p className="mt-3 text-center text-sm text-stone-500">
+          <Link to="/rooms" className="font-medium text-emerald-700 hover:text-emerald-800">
+            &larr; Edit search
+          </Link>
+        </p>
+      )}
 
       <ol className="mt-8 flex items-center justify-center gap-2 text-xs font-medium text-stone-500">
         {["Dates & room", "Confirm quote", "Your details"].map((label, i) => (

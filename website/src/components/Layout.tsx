@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
+import logo from "@/assets/logo.webp";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -20,15 +21,6 @@ const FOOTER_LINKS = [
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
-
-function LeafMark() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="text-emerald-700">
-      <path d="M12 3C7 7 4.5 11 4.5 15a7.5 7.5 0 0 0 15 0c0-4-2.5-8-7.5-12Z" fill="currentColor" opacity="0.9" />
-      <path d="M12 8v11M12 12l-3.2-2M12 14.5l3.2-2" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function NavItem({ href, label, isActive }: { href: string; label: string; isActive: boolean }) {
   return (
@@ -63,9 +55,8 @@ export default function Layout() {
       <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center justify-between gap-3 sm:hidden">
-            <Link to="/" className="flex items-center gap-2">
-              <LeafMark />
-              <span className="font-serif text-lg font-semibold tracking-tight">Wellness Lodge</span>
+            <Link to="/" className="flex items-center">
+              <img src={logo} alt="The Wellness Lodge" className="h-12 w-auto" />
             </Link>
             <Link
               to="/book"
@@ -75,9 +66,8 @@ export default function Layout() {
             </Link>
           </div>
 
-          <Link to="/" className="hidden items-center justify-center gap-2.5 sm:flex">
-            <LeafMark />
-            <span className="font-serif text-2xl font-semibold tracking-tight">Wellness Lodge</span>
+          <Link to="/" className="hidden items-center justify-center sm:flex">
+            <img src={logo} alt="The Wellness Lodge" className="h-20 w-auto" />
           </Link>
 
           <nav
@@ -125,11 +115,8 @@ export default function Layout() {
       <footer className="mt-16 border-t border-stone-200 bg-white">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2">
-              <LeafMark />
-              <p className="font-serif text-lg font-semibold">Wellness Lodge</p>
-            </div>
-            <p className="mt-2 max-w-sm text-sm text-stone-600">
+            <img src={logo} alt="The Wellness Lodge" className="h-14 w-auto" />
+            <p className="mt-3 max-w-sm text-sm text-stone-600">
               Comfortable lodging, car rental, function hall and event hire in Papua New Guinea.
               Rest. Recharge. Reconnect.
             </p>

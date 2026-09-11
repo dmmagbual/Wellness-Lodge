@@ -27,7 +27,8 @@ export default function BookingStatusPanel({
   onRefresh?: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [amount, setAmount] = useState(String((booking.price.totalToea / 100).toFixed(2)));
+  const [amount, setAmount] = useState(String((booking.price.depositToea / 100).toFixed(2)));
+  const balanceToea = booking.price.totalToea - booking.price.depositToea;
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState(false);
@@ -105,8 +106,21 @@ export default function BookingStatusPanel({
 
       {booking.paymentMethod === "BANK_TRANSFER" && (
         <Card className="p-6">
-          <h3 className="font-semibold text-stone-900">Bank transfer details</h3>
-          <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          <h3 className="font-semibold text-stone-900">How to pay by bank transfer</h3>
+
+          <div className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm ring-1 ring-emerald-200">
+            <div className="flex justify-between">
+              <span className="text-emerald-900">1. Transfer the deposit now</span>
+              <span className="font-semibold text-emerald-900">{formatPGK(booking.price.depositToea)}</span>
+            </div>
+            <div className="mt-1 flex justify-between text-emerald-800">
+              <span>2. Pay the balance at check-in</span>
+              <span className="font-medium">{formatPGK(balanceToea)}</span>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm font-medium text-stone-700">Transfer to:</p>
+          <dl className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-stone-500">Account name</dt>
               <dd className="font-medium text-stone-900">{settings?.bankAccountName ?? "To be confirmed"}</dd>
@@ -124,13 +138,14 @@ export default function BookingStatusPanel({
               <dd className="font-medium text-stone-900">{settings?.bankBranch ?? "To be confirmed"}</dd>
             </div>
           </dl>
-          <p className="mt-3 text-sm text-stone-600">
-            Use <strong>{booking.bookingRef}</strong> as your transfer reference so the desk can match your
-            payment.
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-200">
+            Use <strong>{booking.bookingRef}</strong> as your transfer reference — without it the front desk
+            can't match your payment to this booking.
           </p>
 
           {canUploadReceipt && !uploaded && (
             <div className="mt-5 space-y-3 border-t border-stone-100 pt-5">
+              <p className="text-sm font-medium text-stone-700">3. Upload your receipt so we can confirm it</p>
               <Field label="Amount transferred (PGK)">
                 <input
                   type="number"
