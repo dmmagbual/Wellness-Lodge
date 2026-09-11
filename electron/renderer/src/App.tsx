@@ -3,19 +3,23 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/useAuth";
 import Login from "@/views/Login";
+import Dashboard from "@/views/Dashboard";
 import Queue from "@/views/Queue";
 import Enquiries from "@/views/Enquiries";
 import AdminRooms from "@/views/admin/Rooms";
 import AdminStaff from "@/views/admin/Staff";
 import AdminSettings from "@/views/admin/Settings";
 import AdminAuditLog from "@/views/admin/AuditLog";
+import AdminReports from "@/views/admin/Reports";
 
-type View = "queue" | "enquiries" | "rooms" | "staff" | "settings" | "audit";
+type View = "dashboard" | "queue" | "enquiries" | "rooms" | "staff" | "settings" | "audit" | "reports";
 
 const NAV: { key: View; label: string; roles: string[] }[] = [
+  { key: "dashboard", label: "Dashboard", roles: ["FRONT_DESK", "MANAGER", "ADMINISTRATOR", "CONTENT_ADMIN"] },
   { key: "queue", label: "Front Desk", roles: ["FRONT_DESK", "MANAGER", "ADMINISTRATOR", "CONTENT_ADMIN"] },
   { key: "enquiries", label: "Enquiries", roles: ["FRONT_DESK", "MANAGER", "ADMINISTRATOR", "CONTENT_ADMIN"] },
   { key: "rooms", label: "Rooms & Rates", roles: ["MANAGER", "ADMINISTRATOR", "CONTENT_ADMIN"] },
+  { key: "reports", label: "Reports", roles: ["MANAGER", "ADMINISTRATOR"] },
   { key: "staff", label: "Staff", roles: ["ADMINISTRATOR"] },
   { key: "audit", label: "Audit Log", roles: ["MANAGER", "ADMINISTRATOR"] },
   { key: "settings", label: "Settings", roles: ["MANAGER", "ADMINISTRATOR"] },
@@ -23,7 +27,7 @@ const NAV: { key: View; label: string; roles: string[] }[] = [
 
 export default function App() {
   const { loading, user, staff } = useAuth();
-  const [view, setView] = useState<View>("queue");
+  const [view, setView] = useState<View>("dashboard");
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-stone-400">Loading…</div>;
@@ -91,9 +95,11 @@ export default function App() {
       </nav>
 
       <main className="flex-1 overflow-y-auto">
+        {view === "dashboard" && <Dashboard role={staff.role} />}
         {view === "queue" && <Queue role={staff.role} />}
         {view === "enquiries" && <Enquiries />}
         {view === "rooms" && <AdminRooms />}
+        {view === "reports" && <AdminReports />}
         {view === "staff" && <AdminStaff />}
         {view === "settings" && <AdminSettings />}
         {view === "audit" && <AdminAuditLog />}

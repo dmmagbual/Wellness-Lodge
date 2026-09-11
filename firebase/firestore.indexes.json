@@ -17,6 +17,22 @@
       ]
     },
     {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "checkIn", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paymentStatus", "order": "ASCENDING" },
+        { "fieldPath": "confirmedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "paymentReceipts",
       "queryScope": "COLLECTION",
       "fields": [
