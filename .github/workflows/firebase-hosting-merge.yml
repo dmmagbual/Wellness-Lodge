@@ -11,10 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci && npm run build
+      - run: npm --prefix shared ci && npm --prefix shared run build && npm --prefix website ci && npm --prefix website run build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WELLNESS_LODGE }}
           channelId: live
           projectId: wellness-lodge
+          entryPoint: firebase
