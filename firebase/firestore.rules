@@ -13,36 +13,44 @@ rules_version = '2';
 // that makes "no direct-write double booking" enforceable.
 // ---------------------------------------------------------------------------
 
-function isSignedIn() {
-  return request.auth != null;
-}
-
-function staffDoc() {
-  return get(/databases/$(database)/documents/users/$(request.auth.uid));
-}
-
-function isActiveStaff() {
-  return isSignedIn() && staffDoc().data.active == true;
-}
-
-function hasRole(roles) {
-  return isActiveStaff() && staffDoc().data.role in roles;
-}
-
-function isAdmin() {
-  return hasRole(['ADMINISTRATOR']);
-}
-
-function isManagerUp() {
-  return hasRole(['ADMINISTRATOR', 'MANAGER']);
-}
-
-function isContentEditor() {
-  return hasRole(['ADMINISTRATOR', 'MANAGER', 'CONTENT_ADMIN']);
-}
-
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions live INSIDE this match block (not at file scope) so
+    // that `database` -- bound by the {database} path capture above -- is
+    // actually in scope for the get() calls below. Defining them at file
+    // scope compiles (with a "Invalid variable name: database" warning) but
+    // every staff-gated read then fails with permission-denied at runtime,
+    // because $(database) has no binding there. Verified live: this was a
+    // real bug, not just a lint warning -- moving these functions here is
+    // the fix, confirmed against the deployed wellness-lodge project.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function staffDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveStaff() {
+      return isSignedIn() && staffDoc().data.active == true;
+    }
+
+    function hasRole(roles) {
+      return isActiveStaff() && staffDoc().data.role in roles;
+    }
+
+    function isAdmin() {
+      return hasRole(['ADMINISTRATOR']);
+    }
+
+    function isManagerUp() {
+      return hasRole(['ADMINISTRATOR', 'MANAGER']);
+    }
+
+    function isContentEditor() {
+      return hasRole(['ADMINISTRATOR', 'MANAGER', 'CONTENT_ADMIN']);
+    }
 
     // ---- Staff directory -------------------------------------------------
     match /users/{uid} {
