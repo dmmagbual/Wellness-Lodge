@@ -270,6 +270,48 @@ const PAST_EVENTS = [
     approved: true,
     sortOrder: 2,
   },
+  {
+    id: "pe3",
+    title: "Sample Wedding Anniversary",
+    category: "Anniversary",
+    eventDate: "2025-06-21",
+    description: "PLACEHOLDER — replace with an approved photo and description once the lodge confirms publication permission.",
+    images: [
+      "https://images.unsplash.com/photo-1551963319-13ff32a5acd1?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1719499683843-721331f2495f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1739578874534-57d5aecd04f4?auto=format&fit=crop&w=1200&q=80",
+    ],
+    approved: true,
+    sortOrder: 3,
+  },
+  {
+    id: "pe4",
+    title: "Sample Birthday Celebration",
+    category: "Birthday",
+    eventDate: "2025-09-05",
+    description: "PLACEHOLDER — replace with an approved photo and description once the lodge confirms publication permission.",
+    images: [
+      "https://images.unsplash.com/photo-1648090328043-e75292e328ec?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1648090319889-73787d9b3f14?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1656450552703-83ea08a43263?auto=format&fit=crop&w=1200&q=80",
+    ],
+    approved: true,
+    sortOrder: 4,
+  },
+  {
+    id: "pe5",
+    title: "Sample Engagement Celebration",
+    category: "Engagement",
+    eventDate: "2025-04-12",
+    description: "PLACEHOLDER — replace with an approved photo and description once the lodge confirms publication permission.",
+    images: [
+      "https://images.unsplash.com/photo-1719499719196-7a256956a22b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1718997534125-052b2ff48cd0?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1645827042168-4fb0cdd0bf7e?auto=format&fit=crop&w=1200&q=80",
+    ],
+    approved: true,
+    sortOrder: 5,
+  },
 ];
 
 const SETTINGS_PUBLIC = {

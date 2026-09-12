@@ -63,10 +63,10 @@ export const HALL_IMAGES: Record<string, string> = {
 };
 export const HALL_IMAGE_FALLBACK = unsplash("photo-1519167758481-83f550bb49b3");
 
-// pe1 "Sample Garden Wedding" and pe2 "Sample Corporate Conference" use
-// photos of PNG/Melanesian guests in modern, professional dress (wedding
-// attire / business attire) rather than generic stock or tribal imagery,
-// matching the lodge's real clientele for the client demo.
+// pe1-pe5 (Wedding, Conference, Anniversary, Birthday, Engagement) use photos
+// of PNG/Melanesian guests in modern, professional dress rather than
+// generic stock or tribal imagery, matching the lodge's real clientele for
+// the client demo.
 export const PAST_EVENT_IMAGES: Record<string, string[]> = {
   pe1: [
     unsplash("photo-1606217239582-d9f72323bcd7"),
@@ -77,6 +77,21 @@ export const PAST_EVENT_IMAGES: Record<string, string[]> = {
     unsplash("photo-1573164574572-cb89e39749b4"),
     unsplash("photo-1573164574511-73c773193279"),
     unsplash("photo-1573497491208-6b1acb260507"),
+  ],
+  pe3: [
+    unsplash("photo-1551963319-13ff32a5acd1"),
+    unsplash("photo-1719499683843-721331f2495f"),
+    unsplash("photo-1739578874534-57d5aecd04f4"),
+  ],
+  pe4: [
+    unsplash("photo-1648090328043-e75292e328ec"),
+    unsplash("photo-1648090319889-73787d9b3f14"),
+    unsplash("photo-1656450552703-83ea08a43263"),
+  ],
+  pe5: [
+    unsplash("photo-1719499719196-7a256956a22b"),
+    unsplash("photo-1718997534125-052b2ff48cd0"),
+    unsplash("photo-1645827042168-4fb0cdd0bf7e"),
   ],
 };
 export const PAST_EVENT_FALLBACK = unsplash("photo-1606217239582-d9f72323bcd7");

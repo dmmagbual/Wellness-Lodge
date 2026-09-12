@@ -15,9 +15,21 @@ export default function PastEvents() {
 
   return (
     <div>
-      <div className="relative h-56 overflow-hidden sm:h-72">
-        <img src={HERO_IMAGES.pastEvents} alt="Wedding reception at Wellness Lodge" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+      <div className="relative h-72 overflow-hidden bg-[#06170f] sm:h-96">
+        {/* Blurred, scaled backdrop fills the frame so the crop never looks empty... */}
+        <img
+          src={HERO_IMAGES.pastEvents}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full scale-110 object-cover object-top opacity-50 blur-2xl"
+        />
+        {/* ...while the real photo is shown in full (object-contain), so no part of it is cropped. */}
+        <img
+          src={HERO_IMAGES.pastEvents}
+          alt="Wedding reception at Wellness Lodge"
+          className="absolute inset-0 h-full w-full object-contain"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 text-center text-white">
           <p className="text-xs font-semibold tracking-wide uppercase text-emerald-200">Gallery</p>
           <h1 className="mt-1 font-serif text-3xl font-bold sm:text-4xl">Past Events</h1>

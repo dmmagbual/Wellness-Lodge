@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import logo from "@/assets/logo.webp";
 
 const NAV_LINKS = [
@@ -40,9 +41,42 @@ function NavItem({ href, label, isActive }: { href: string; label: string; isAct
   );
 }
 
+/** Brand mark: the round logo icon plus a real (scalable, always-legible)
+ * "Wellness Lodge" text wordmark — the raster text baked into the logo
+ * image itself reads fine at full size but blurs into nothing once the
+ * icon is shrunk into a header, so we pair it with live text instead of
+ * just scaling the image up. */
+function BrandMark({ compact, dark }: { compact: boolean; dark?: boolean }) {
+  return (
+    <span className="flex items-center gap-2.5">
+      <img
+        src={logo}
+        alt=""
+        aria-hidden="true"
+        className={`w-auto shrink-0 transition-all duration-300 ${compact ? "h-9" : "h-12"}`}
+      />
+      <span
+        className={`font-serif leading-none font-bold tracking-tight transition-all duration-300 ${
+          compact ? "text-lg" : "text-xl sm:text-2xl"
+        } ${dark ? "text-white" : "text-stone-900"}`}
+      >
+        Wellness Lodge
+      </span>
+    </span>
+  );
+}
+
 export default function Layout() {
   const year = new Date().getFullYear();
   const { pathname } = useLocation();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 antialiased flex flex-col">
@@ -52,28 +86,21 @@ export default function Layout() {
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center justify-between gap-3 sm:hidden">
-            <Link to="/" className="flex items-center">
-              <img src={logo} alt="The Wellness Lodge" className="h-12 w-auto" />
-            </Link>
-            <Link
-              to="/book"
-              className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-            >
-              Book Now
-            </Link>
-          </div>
-
-          <Link to="/" className="hidden items-center justify-center sm:flex">
-            <img src={logo} alt="The Wellness Lodge" className="h-20 w-auto" />
+      <header
+        className={`sticky top-0 z-20 border-b bg-white/95 backdrop-blur transition-all duration-300 ${
+          scrolled ? "border-stone-200 shadow-sm" : "border-transparent"
+        }`}
+      >
+        <div
+          className={`mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 transition-[padding] duration-300 ${
+            scrolled ? "py-2.5" : "py-4"
+          }`}
+        >
+          <Link to="/" className="flex items-center">
+            <BrandMark compact={scrolled} />
           </Link>
 
-          <nav
-            className="mt-3 hidden items-center justify-center gap-8 sm:flex"
-            aria-label="Primary"
-          >
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary">
             {NAV_LINKS.map((l) => {
               const isActive =
                 l.href === "/"
@@ -81,23 +108,30 @@ export default function Layout() {
                   : pathname === l.href || (l.href === "/services" && SERVICE_PATHS.includes(pathname));
               return <NavItem key={l.href} href={l.href} label={l.label} isActive={isActive} />;
             })}
-            <span className="h-4 w-px bg-stone-200" />
+          </nav>
+
+          <div className="flex items-center gap-3">
             <Link
               to="/booking-lookup"
-              className="text-sm font-medium whitespace-nowrap text-stone-500 hover:text-stone-900"
+              className="hidden text-sm font-medium whitespace-nowrap text-stone-500 hover:text-stone-900 lg:inline"
             >
               Find my booking
             </Link>
             <Link
               to="/book"
-              className="rounded-full bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+              className={`rounded-full bg-emerald-700 font-semibold text-white transition-all duration-300 hover:bg-emerald-800 ${
+                scrolled ? "px-4 py-2 text-sm" : "px-5 py-2.5 text-sm"
+              }`}
             >
               Book Now
             </Link>
-          </nav>
+          </div>
         </div>
 
-        <nav className="flex gap-4 overflow-x-auto border-t border-stone-100 px-4 py-2.5 sm:hidden" aria-label="Primary mobile">
+        <nav
+          className="flex gap-4 overflow-x-auto border-t border-stone-100 px-4 py-2.5 lg:hidden"
+          aria-label="Primary mobile"
+        >
           {NAV_LINKS.map((l) => {
             const isActive =
               l.href === "/"
@@ -105,6 +139,12 @@ export default function Layout() {
                 : pathname === l.href || (l.href === "/services" && SERVICE_PATHS.includes(pathname));
             return <NavItem key={l.href} href={l.href} label={l.label} isActive={isActive} />;
           })}
+          <Link
+            to="/booking-lookup"
+            className="ml-auto shrink-0 text-sm font-medium whitespace-nowrap text-stone-500 hover:text-stone-900"
+          >
+            Find my booking
+          </Link>
         </nav>
       </header>
 
@@ -115,7 +155,9 @@ export default function Layout() {
       <footer className="mt-16 bg-[#06170f] text-emerald-100/80">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:grid-cols-4">
           <div className="md:col-span-2">
-            <img src={logo} alt="The Wellness Lodge" className="h-14 w-auto brightness-0 invert" />
+            <Link to="/" className="inline-flex items-center">
+              <BrandMark compact dark />
+            </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed">
               Comfortable lodging, car rental, function hall and event hire in Papua New Guinea.
               Rest. Recharge. Reconnect.
