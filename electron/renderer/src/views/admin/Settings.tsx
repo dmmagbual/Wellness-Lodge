@@ -3,6 +3,9 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { LodgeSettings } from "@wellness-lodge/shared";
 import { Card, Field, PrimaryButton, inputClass } from "@/components/ui";
+import SettingsMenu from "@/views/admin/SettingsMenu";
+import SettingsCarRental from "@/views/admin/SettingsCarRental";
+import SettingsFunctionHall from "@/views/admin/SettingsFunctionHall";
 
 const DEFAULTS: LodgeSettings = {
   lodgeName: "Wellness Lodge",
@@ -31,7 +34,16 @@ const DEFAULTS: LodgeSettings = {
   socials: {},
 };
 
-export default function AdminSettings() {
+type Tab = "general" | "menu" | "carRental" | "functionHall";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "general", label: "General" },
+  { key: "menu", label: "Restaurant & Cafe Menu" },
+  { key: "carRental", label: "Car Rental" },
+  { key: "functionHall", label: "Function Hall & Events" },
+];
+
+function GeneralSettings() {
   const [settings, setSettings] = useState<LodgeSettings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,10 +68,10 @@ export default function AdminSettings() {
     setSaved(true);
   }
 
-  if (loading) return <div className="p-6 text-sm text-stone-500">Loading…</div>;
+  if (loading) return <div className="text-sm text-stone-500">Loading…</div>;
 
   return (
-    <div className="p-6">
+    <div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-5">
           <p className="font-semibold text-stone-900">Contact details</p>
@@ -175,6 +187,35 @@ export default function AdminSettings() {
           {saving ? "Saving…" : "Save settings"}
         </PrimaryButton>
         {saved && <p className="text-sm text-emerald-700">Saved.</p>}
+      </div>
+    </div>
+  );
+}
+
+export default function AdminSettings() {
+  const [tab, setTab] = useState<Tab>("general");
+
+  return (
+    <div className="p-6">
+      <nav className="flex flex-wrap gap-1 border-b border-stone-200 pb-3">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              tab === t.key ? "bg-emerald-800 text-white shadow-sm" : "text-stone-600 hover:bg-stone-100"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="mt-5">
+        {tab === "general" && <GeneralSettings />}
+        {tab === "menu" && <SettingsMenu />}
+        {tab === "carRental" && <SettingsCarRental />}
+        {tab === "functionHall" && <SettingsFunctionHall />}
       </div>
     </div>
   );
