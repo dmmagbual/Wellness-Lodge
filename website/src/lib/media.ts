@@ -44,7 +44,7 @@ export const ROOM_IMAGES: Record<string, string[]> = {
     unsplash("photo-1582719478250-c89cae4dc85b"),
   ],
   "family-suite": [
-    unsplash("photo-1582719478141-6d301b6e8b58"),
+    unsplash("photo-1631844820835-e698dc518bc6"),
     unsplash("photo-1560448204-e02f11c3d0e2"),
   ],
 };
@@ -63,7 +63,7 @@ export const HALL_IMAGES: Record<string, string> = {
 };
 export const HALL_IMAGE_FALLBACK = unsplash("photo-1519167758481-83f550bb49b3");
 
-// pe1-pe5 (Wedding, Conference, Anniversary, Birthday, Engagement) use photos
+// pe1-pe6 (Wedding, Conference, Anniversary, Birthday, Engagement, Christening) use photos
 // of PNG/Melanesian guests in modern, professional dress rather than
 // generic stock or tribal imagery, matching the lodge's real clientele for
 // the client demo.
@@ -92,6 +92,11 @@ export const PAST_EVENT_IMAGES: Record<string, string[]> = {
     unsplash("photo-1719499719196-7a256956a22b"),
     unsplash("photo-1718997534125-052b2ff48cd0"),
     unsplash("photo-1645827042168-4fb0cdd0bf7e"),
+  ],
+  pe6: [
+    unsplash("photo-1731743215053-53eb81151f60"),
+    unsplash("photo-1731743214989-9b4d60937ddf"),
+    unsplash("photo-1731743214318-e259c46f6b2c"),
   ],
 };
 export const PAST_EVENT_FALLBACK = unsplash("photo-1606217239582-d9f72323bcd7");

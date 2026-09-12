@@ -159,7 +159,7 @@ const CATEGORIES = [
     sizeSqm: 55,
     amenities: ["King bed", "Two single beds", "Air-conditioning", "Free Wi-Fi", "Breakfast included"],
     images: [
-      "https://images.unsplash.com/photo-1582719478141-6d301b6e8b58?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1631844820835-e698dc518bc6?auto=format&fit=crop&w=1200&q=80",
       "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80",
     ],
     totalRooms: 3,
@@ -311,6 +311,20 @@ const PAST_EVENTS = [
     ],
     approved: true,
     sortOrder: 5,
+  },
+  {
+    id: "pe6",
+    title: "Sample Christening Celebration",
+    category: "Christening",
+    eventDate: "2025-07-19",
+    description: "PLACEHOLDER — replace with an approved photo and description once the lodge confirms publication permission.",
+    images: [
+      "https://images.unsplash.com/photo-1731743215053-53eb81151f60?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1731743214989-9b4d60937ddf?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1731743214318-e259c46f6b2c?auto=format&fit=crop&w=1200&q=80",
+    ],
+    approved: true,
+    sortOrder: 6,
   },
 ];
 
