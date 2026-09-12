@@ -133,6 +133,12 @@ export interface Booking {
   categoryId: string;
   roomId?: string | null; // assigned at check-in, not at booking time
   guest: GuestDetails;
+  // Denormalized lowercase copy of guest.name, set at creation, used only for
+  // case-insensitive front-desk search (Firestore has no case-insensitive or
+  // "contains" query, and guest names are typed in all sorts of casing).
+  // Optional because bookings created before this field existed don't have
+  // it — they just won't turn up in a name search until re-saved.
+  guestNameLower?: string;
   checkIn: string; // YYYY-MM-DD
   checkOut: string; // YYYY-MM-DD
   nights: number;
@@ -145,6 +151,8 @@ export interface Booking {
   confirmedBy?: string | null; // staff uid
   confirmedAt?: string | null;
   cancelledReason?: string | null;
+  refundedBy?: string | null; // staff uid — set when paymentStatus becomes REFUNDED
+  refundedAt?: string | null;
   source: "WEBSITE" | "FRONT_DESK" | "PHONE" | "WALK_IN";
   createdAt: string;
   updatedAt: string;

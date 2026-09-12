@@ -9,11 +9,33 @@ import {
   callCancelBooking,
   callCheckInGuest,
   callCheckOutGuest,
+  callMarkRefundPending,
+  callMarkRefunded,
 } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
-import { formatPGK } from "@wellness-lodge/shared";
-import type { Booking, PaymentReceipt, StaffRole } from "@wellness-lodge/shared";
-import { Badge, Card, DangerButton, PrimaryButton, SecondaryButton, Field, inputClass } from "@/components/ui";
+import { formatPGK, INVENTORY_LOCKING_STATUSES } from "@wellness-lodge/shared";
+import type { AuditLogEntry, Booking, PaymentReceipt, StaffRole } from "@wellness-lodge/shared";
+import { Badge, Card, DangerButton, PrimaryButton, SecondaryButton, Field, inputClass, PaymentStatusFlag } from "@/components/ui";
+
+// Human-readable labels for the raw `action` strings written by writeAudit /
+// writeAuditNow (firebase/functions/src/lib/audit.ts). Falls back to the raw
+// string for anything not listed here, so a new action type never disappears
+// silently -- it just shows undecorated until someone adds a label for it.
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  "booking.create": "Booking created",
+  "booking.submitReceipt": "Receipt submitted",
+  "booking.acceptPayAtDesk": "Accepted — hold started",
+  "booking.confirm": "Payment confirmed",
+  "booking.rejectReceipt": "Receipt rejected",
+  "booking.cancel": "Booking cancelled",
+  "booking.checkIn": "Checked in",
+  "booking.checkOut": "Checked out",
+  "booking.markRefundPending": "Marked refund pending",
+  "booking.markRefunded": "Marked refunded",
+  "booking.override": "Field overridden",
+};
+
+type AuditRow = AuditLogEntry & { timestampIso: string };
 
 const STATUS_TONE: Record<string, "amber" | "emerald" | "stone" | "red" | "blue"> = {
   AWAITING_RECEIPT: "amber",
@@ -61,10 +83,20 @@ export default function BookingDrawer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [showReasonFor, setShowReasonFor] = useState<"reject" | "cancel" | null>(null);
+  const [showReasonFor, setShowReasonFor] = useState<"reject" | "cancel" | "refund" | null>(null);
 
   const { data: receipts } = useCollection<PaymentReceipt>(
     () => query(collection(db, "paymentReceipts"), where("bookingRef", "==", booking.bookingRef), orderBy("uploadedAt", "desc")),
+    [booking.bookingRef]
+  );
+
+  // Every sensitive mutation writes to auditLog with targetId == bookingRef
+  // (see firebase/functions/src/lib/audit.ts) -- this is that same trail,
+  // filtered to just this booking, so its full history is visible right where
+  // staff are already looking instead of only in the separate Manager/Admin
+  // Audit Log screen.
+  const { data: history } = useCollection<AuditRow>(
+    () => query(collection(db, "auditLog"), where("targetId", "==", booking.bookingRef), orderBy("timestampIso", "desc")),
     [booking.bookingRef]
   );
 
@@ -82,6 +114,9 @@ export default function BookingDrawer({
   }
 
   const canManage = ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"].includes(role);
+  // Refunds are a financial reversal — restricted to Manager/Admin, same
+  // privilege level as rate changes and the status-override escape hatch.
+  const canRefund = ["MANAGER", "ADMINISTRATOR"].includes(role);
 
   return (
     <div className="fixed inset-0 z-30 flex justify-end bg-black/30" onClick={onClose}>
@@ -89,7 +124,10 @@ export default function BookingDrawer({
         <div className="sticky top-0 flex items-center justify-between border-b border-stone-200 bg-white px-5 py-4">
           <div>
             <p className="text-lg font-bold text-stone-900">{booking.bookingRef}</p>
-            <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replaceAll("_", " ")}</Badge>
+            <div className="flex items-center gap-1.5">
+              <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replaceAll("_", " ")}</Badge>
+              <PaymentStatusFlag paymentStatus={booking.paymentStatus} />
+            </div>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
             ✕
@@ -175,6 +213,25 @@ export default function BookingDrawer({
             </Card>
           )}
 
+          <Card className="p-4">
+            <p className="font-semibold text-stone-900">Activity history</p>
+            {history.length === 0 && <p className="mt-2 text-sm text-stone-500">No recorded activity yet.</p>}
+            {history.length > 0 && (
+              <div className="mt-3 space-y-3">
+                {history.map((h) => (
+                  <div key={h.id} className="border-t border-stone-100 pt-3 first:border-t-0 first:pt-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-stone-900">{AUDIT_ACTION_LABELS[h.action] ?? h.action}</p>
+                      <span className="shrink-0 text-xs text-stone-500">{new Date(h.timestampIso).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs text-stone-500">{h.actorName}</p>
+                    {h.reason && <p className="mt-1 text-sm italic text-stone-600">"{h.reason}"</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           {canManage && (
@@ -209,6 +266,36 @@ export default function BookingDrawer({
                   Check out
                 </PrimaryButton>
               )}
+              {canRefund &&
+                booking.paymentStatus === "VERIFIED" &&
+                !INVENTORY_LOCKING_STATUSES.includes(booking.status) && (
+                  <SecondaryButton
+                    className="w-full"
+                    disabled={busy}
+                    onClick={() => setShowReasonFor(showReasonFor === "refund" ? null : "refund")}
+                  >
+                    Mark refund pending
+                  </SecondaryButton>
+                )}
+              {/* Booking still holds a room (HELD/CONFIRMED/CHECKED_IN) with a
+                  verified payment -- refund isn't offered until it's cancelled
+                  (or otherwise wound down), so this state can't happen again. */}
+              {canRefund &&
+                booking.paymentStatus === "VERIFIED" &&
+                INVENTORY_LOCKING_STATUSES.includes(booking.status) && (
+                  <p className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 ring-1 ring-stone-200">
+                    Cancel this booking before a refund can be marked — it's still {booking.status.replaceAll("_", " ").toLowerCase()} and holding a room.
+                  </p>
+                )}
+              {canRefund && booking.paymentStatus === "REFUND_PENDING" && (
+                <PrimaryButton
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => run(() => callMarkRefunded({ bookingRef: booking.bookingRef }))}
+                >
+                  Mark refunded
+                </PrimaryButton>
+              )}
               {!["CANCELLED", "COMPLETED", "EXPIRED", "REJECTED"].includes(booking.status) && (
                 <DangerButton className="w-full" disabled={busy} onClick={() => setShowReasonFor(showReasonFor === "cancel" ? null : "cancel")}>
                   Cancel booking
@@ -217,7 +304,15 @@ export default function BookingDrawer({
 
               {showReasonFor && (
                 <div className="rounded-lg border border-stone-200 p-3">
-                  <Field label={showReasonFor === "reject" ? "Reason for rejecting the receipt" : "Reason for cancelling"}>
+                  <Field
+                    label={
+                      showReasonFor === "reject"
+                        ? "Reason for rejecting the receipt"
+                        : showReasonFor === "refund"
+                          ? "Reason for the refund"
+                          : "Reason for cancelling"
+                    }
+                  >
                     <input className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} />
                   </Field>
                   <div className="mt-2 flex justify-end gap-2">
@@ -225,11 +320,11 @@ export default function BookingDrawer({
                     <PrimaryButton
                       disabled={!reason || busy}
                       onClick={() =>
-                        run(() =>
-                          showReasonFor === "reject"
-                            ? callRejectReceipt({ bookingRef: booking.bookingRef, reason })
-                            : callCancelBooking({ bookingRef: booking.bookingRef, reason })
-                        )
+                        run(() => {
+                          if (showReasonFor === "reject") return callRejectReceipt({ bookingRef: booking.bookingRef, reason });
+                          if (showReasonFor === "refund") return callMarkRefundPending({ bookingRef: booking.bookingRef, reason });
+                          return callCancelBooking({ bookingRef: booking.bookingRef, reason });
+                        })
                       }
                     >
                       Confirm

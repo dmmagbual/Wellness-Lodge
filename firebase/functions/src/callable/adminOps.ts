@@ -4,7 +4,9 @@ import { db, auth } from "../lib/admin";
 import { badRequest, requireSignedIn, notFound } from "../lib/errors";
 import { loadActiveStaff, assertRole } from "../lib/staff";
 import { writeAuditNow } from "../lib/audit";
-import type { StaffRole, RatePeriod } from "@wellness-lodge/shared";
+import { RESEND_API_KEY, sendRefundProcessedEmail } from "../lib/mail";
+import { INVENTORY_LOCKING_STATUSES } from "@wellness-lodge/shared";
+import type { StaffRole, RatePeriod, Booking } from "@wellness-lodge/shared";
 
 const createStaffSchema = z.object({
   email: z.string().email(),
@@ -14,7 +16,7 @@ const createStaffSchema = z.object({
 });
 
 /** Administrator only — provisions a staff login (Firebase Auth user + Firestore profile). */
-export const createStaffUser = onCall({ cors: true }, async (req) => {
+export const createStaffUser = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["ADMINISTRATOR"]);
@@ -52,7 +54,7 @@ export const createStaffUser = onCall({ cors: true }, async (req) => {
 const deactivateSchema = z.object({ uid: z.string().min(1), reason: z.string().min(3).max(300) });
 
 /** Administrator only — revokes portal + front-desk app access immediately. */
-export const deactivateStaffUser = onCall({ cors: true }, async (req) => {
+export const deactivateStaffUser = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["ADMINISTRATOR"]);
@@ -92,7 +94,7 @@ const ratePeriodSchema = z.object({
  * (Acceptance test: "The system rejects overlapping rate periods and
  * records the previous and new values for approved changes.")
  */
-export const saveRatePeriod = onCall({ cors: true }, async (req) => {
+export const saveRatePeriod = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["MANAGER", "ADMINISTRATOR"]);
@@ -147,7 +149,7 @@ const overrideSchema = z.object({
  * history"). Does not touch inventory counters — use cancelBooking /
  * confirmBooking for anything that should also change the room lock.
  */
-export const overrideBookingField = onCall({ cors: true }, async (req) => {
+export const overrideBookingField = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["MANAGER", "ADMINISTRATOR"]);
@@ -169,6 +171,91 @@ export const overrideBookingField = onCall({ cors: true }, async (req) => {
     after: { [field]: value },
     reason,
   });
+
+  return { ok: true };
+});
+
+const refundSchema = z.object({ bookingRef: z.string().min(4), reason: z.string().min(3).max(500) });
+
+/**
+ * Manager/Admin only — flags a verified payment as needing a refund (e.g.
+ * after cancelling a booking that had already been paid). This does not move
+ * any money itself — the actual bank transfer/cash refund still happens
+ * off-system — it exists so a refund owed to a guest is never just silently
+ * forgotten once the booking is cancelled. Restricted to Manager/Admin
+ * (not plain Front Desk) since it's a financial reversal, same privilege
+ * level as overrideBookingField and saveRatePeriod.
+ */
+export const markRefundPending = onCall({ cors: true, invoker: "public" }, async (req) => {
+  requireSignedIn(req.auth);
+  const staff = await loadActiveStaff(req.auth.uid);
+  assertRole(staff, ["MANAGER", "ADMINISTRATOR"]);
+  const { bookingRef, reason } = refundSchema.parse(req.data);
+
+  const ref = db.collection("bookings").doc(bookingRef.toUpperCase());
+  const snap = await ref.get();
+  if (!snap.exists) notFound("Booking not found.");
+  const booking = snap.data() as Booking;
+  if (booking.paymentStatus !== "VERIFIED") {
+    badRequest(`Only a verified payment can be marked for refund (current: ${booking.paymentStatus}).`);
+  }
+  // A booking still HELD/CONFIRMED/CHECKED_IN is still holding a room -- refunding
+  // its payment while that's true leaves the system saying "money returned" and
+  // "room still reserved" at the same time (and Check-in stays clickable). Cancel
+  // (or check out / let it expire) first so the refund reflects a booking that's
+  // actually been wound down, not one still mid-stay.
+  if (INVENTORY_LOCKING_STATUSES.includes(booking.status)) {
+    badRequest(
+      `This booking is still ${booking.status.replace(/_/g, " ")} and holding a room. Cancel the booking first, then mark the refund.`
+    );
+  }
+
+  await ref.update({ paymentStatus: "REFUND_PENDING", updatedAt: new Date().toISOString() });
+  await writeAuditNow({
+    actorUid: staff.uid,
+    actorName: staff.name,
+    action: "booking.markRefundPending",
+    targetType: "booking",
+    targetId: bookingRef.toUpperCase(),
+    before: { paymentStatus: booking.paymentStatus },
+    after: { paymentStatus: "REFUND_PENDING" },
+    reason,
+  });
+
+  return { ok: true };
+});
+
+const refundedSchema = z.object({ bookingRef: z.string().min(4), note: z.string().max(500).optional() });
+
+/** Manager/Admin only — marks a pending refund as actually paid back to the guest. */
+export const markRefunded = onCall({ cors: true, invoker: "public", secrets: [RESEND_API_KEY] }, async (req) => {
+  requireSignedIn(req.auth);
+  const staff = await loadActiveStaff(req.auth.uid);
+  assertRole(staff, ["MANAGER", "ADMINISTRATOR"]);
+  const { bookingRef, note } = refundedSchema.parse(req.data);
+
+  const ref = db.collection("bookings").doc(bookingRef.toUpperCase());
+  const snap = await ref.get();
+  if (!snap.exists) notFound("Booking not found.");
+  const booking = snap.data() as Booking;
+  if (booking.paymentStatus !== "REFUND_PENDING") {
+    badRequest(`Only a pending refund can be marked refunded (current: ${booking.paymentStatus}).`);
+  }
+
+  const now = new Date().toISOString();
+  await ref.update({ paymentStatus: "REFUNDED", refundedBy: staff.uid, refundedAt: now, updatedAt: now });
+  await writeAuditNow({
+    actorUid: staff.uid,
+    actorName: staff.name,
+    action: "booking.markRefunded",
+    targetType: "booking",
+    targetId: bookingRef.toUpperCase(),
+    before: { paymentStatus: "REFUND_PENDING" },
+    after: { paymentStatus: "REFUNDED" },
+    reason: note,
+  });
+
+  await sendRefundProcessedEmail({ ...booking, paymentStatus: "REFUNDED" });
 
   return { ok: true };
 });

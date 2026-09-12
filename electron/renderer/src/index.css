@@ -1,7 +1,38 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap");
 @import "tailwindcss";
+
+/* Boutique hospitality palette: a warm ivory ground (instead of flat white)
+   plus a "brass" accent used only for highlights -- selected calendar dates,
+   the occupancy ring, the header's trim line -- never for anything that
+   already carries meaning (status/payment colors stay red/amber/emerald/
+   blue exactly as before). Deliberately more brown/antique than Tailwind's
+   built-in amber so it never reads as another "warning" color. Defining
+   these via @theme (Tailwind v4 CSS-first config) makes them ordinary
+   utilities: bg-brass-500, text-brass-700, ring-brass-400, bg-ivory, etc. */
+@theme {
+  --color-ivory: #fbf8f2;
+  --color-ivory-100: #f5f1e6;
+
+  --color-brass-50: #faf3e5;
+  --color-brass-100: #f3e4c4;
+  --color-brass-200: #e7cc97;
+  --color-brass-300: #d8b36c;
+  --color-brass-400: #c69a4e;
+  --color-brass-500: #ac7f3a;
+  --color-brass-600: #8c6530;
+  --color-brass-700: #6e4e27;
+  --color-brass-800: #543c1f;
+  --color-brass-900: #3b2a16;
+}
 
 :root {
   color-scheme: light;
+  /* Display serif for the lodge wordmark and section headings -- everything
+     else (data, controls, tables) stays in the sans stack below for density
+     and legibility; a display font used only in small doses is what reads
+     as "boutique hotel" rather than "generic admin panel". Falls back
+     cleanly to the sans stack if the Google Fonts request fails offline. */
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
 }
 
 body {
@@ -10,10 +41,15 @@ body {
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+.font-display {
+  font-family: var(--font-display);
 }
 
 ::selection {
-  background: #047857;
+  background: #065f46;
   color: #fff;
 }
 

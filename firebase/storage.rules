@@ -12,18 +12,28 @@ rules_version = '2';
 //                         nobody but active staff may ever read them back.
 // ---------------------------------------------------------------------------
 
-function isActiveStaff() {
-  return request.auth != null &&
-    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.active == true;
-}
-
-function bookingAwaitingReceipt(bookingRef) {
-  let b = firestore.get(/databases/(default)/documents/bookings/$(bookingRef));
-  return b.data.status in ['AWAITING_RECEIPT', 'AWAITING_FRONT_DESK'];
-}
-
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // Defined INSIDE this match block, not at file scope. A `firestore.get()`
+    // call made from a function defined outside `match /b/{bucket}/o` compiles
+    // with only a warning ("occurs outside of defining scope") -- the deploy
+    // looks successful, but the call does not resolve correctly at runtime, so
+    // every rule using these functions silently denies. This is the exact same
+    // class of bug already found and fixed in firestore.rules this session
+    // (helper functions needing to live inside the match block that binds
+    // their scope) -- confirmed live: guest receipt uploads failed with
+    // storage/unauthorized despite the booking's status being correct, until
+    // these were moved here.
+    function isActiveStaff() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
+    function bookingAwaitingReceipt(bookingRef) {
+      let b = firestore.get(/databases/(default)/documents/bookings/$(bookingRef));
+      return b.data.status in ['AWAITING_RECEIPT', 'AWAITING_FRONT_DESK'];
+    }
 
     match /media/{allPaths=**} {
       allow read: if true;

@@ -19,7 +19,7 @@ const enquirySchema = z.object({
  * booking engine). This lands every enquiry straight in the front desk
  * app's Enquiries inbox with a live listener, same as bookings.
  */
-export const submitEnquiry = onCall({ cors: true }, async (req) => {
+export const submitEnquiry = onCall({ cors: true, invoker: "public" }, async (req) => {
   const input = enquirySchema.parse(req.data);
   const ref = db.collection("enquiries").doc();
   const now = new Date().toISOString();

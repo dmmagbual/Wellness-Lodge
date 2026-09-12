@@ -132,8 +132,14 @@ service cloud.firestore {
     }
 
     // ---- Audit log ------------------------------------------------------------
+    // Read access is staff-wide (not Manager-up only) so Front Desk can see a
+    // booking's own history in BookingDrawer -- "I want everything to be
+    // auditable with traces and the front desk app should show everything
+    // happening on every booking." Front desk already reads the bookings
+    // collection directly; this is a read-only history of that same data,
+    // never writable by any client role.
     match /auditLog/{id} {
-      allow read: if isManagerUp();
+      allow read: if isActiveStaff();
       allow write: if false; // written by functions only
     }
 

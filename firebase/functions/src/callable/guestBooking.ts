@@ -26,7 +26,7 @@ const availabilitySchema = z.object({
 });
 
 /** Public — powers the live search on the website. No auth required. */
-export const checkAvailability = onCall({ cors: true }, async (req) => {
+export const checkAvailability = onCall({ cors: true, invoker: "public" }, async (req) => {
   const { categoryId, checkIn, checkOut } = availabilitySchema.parse(req.data);
   if (checkOut <= checkIn) badRequest("Check-out must be after check-in.");
   if (checkIn < todayStr()) badRequest("Check-in cannot be in the past.");
@@ -53,7 +53,13 @@ const guestSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
   phone: z.string().min(5).max(30),
-  notes: z.string().max(1000).optional(),
+  // .nullish() not .optional(): Firebase's callable SDK turns an `undefined`
+  // field into `null` on the wire, so a blank notes box arrives as `null`,
+  // not a missing key — .optional() alone rejects that. Confirmed live via
+  // the identical crash in the new staff-facing createWalkInBooking, which
+  // shares this exact schema shape; fixing here too since a guest leaving
+  // notes blank on the real website hits the same code path.
+  notes: z.string().max(1000).nullish(),
 });
 
 const createBookingSchema = z.object({
@@ -75,7 +81,7 @@ const createBookingSchema = z.object({
  * are clearly gone, but that check is advisory — the authoritative lock
  * happens in acceptPayAtDesk / confirmBooking.
  */
-export const createBooking = onCall({ cors: true }, async (req) => {
+export const createBooking = onCall({ cors: true, invoker: "public" }, async (req) => {
   const input = createBookingSchema.parse(req.data);
   if (input.checkOut <= input.checkIn) badRequest("Check-out must be after check-in.");
   if (input.checkIn < todayStr()) badRequest("Check-in cannot be in the past.");
@@ -126,7 +132,11 @@ export const createBooking = onCall({ cors: true }, async (req) => {
     bookingRef,
     categoryId: input.categoryId,
     roomId: null,
-    guest: input.guest,
+    // Normalize the wire's `null` (Firebase's callable SDK sends undefined
+    // fields as null) back to `undefined` so the stored shape matches
+    // GuestDetails exactly, same as before this schema accepted null.
+    guest: { ...input.guest, notes: input.guest.notes ?? undefined },
+    guestNameLower: input.guest.name.trim().toLowerCase(),
     checkIn: input.checkIn,
     checkOut: input.checkOut,
     nights: nights.length,
@@ -170,7 +180,7 @@ const lookupSchema = z.object({
 });
 
 /** Public — guest checks their own booking status by reference + email. */
-export const lookupBooking = onCall({ cors: true }, async (req) => {
+export const lookupBooking = onCall({ cors: true, invoker: "public" }, async (req) => {
   const { bookingRef, email } = lookupSchema.parse(req.data);
   const snap = await db.collection("bookings").doc(bookingRef.toUpperCase()).get();
   if (!snap.exists) notFound("No booking found with that reference and email.");
@@ -194,7 +204,7 @@ const submitReceiptSchema = z.object({
  * allowing the upload). This just links the receipt to the booking and
  * moves it into the front desk queue.
  */
-export const submitReceipt = onCall({ cors: true }, async (req) => {
+export const submitReceipt = onCall({ cors: true, invoker: "public" }, async (req) => {
   const input = submitReceiptSchema.parse(req.data);
   const ref = db.collection("bookings").doc(input.bookingRef.toUpperCase());
   const snap = await ref.get();

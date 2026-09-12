@@ -13,6 +13,7 @@ import AdminAuditLog from "@/views/admin/AuditLog";
 import AdminReports from "@/views/admin/Reports";
 
 type View = "dashboard" | "queue" | "enquiries" | "rooms" | "staff" | "settings" | "audit" | "reports";
+type QueueTab = "action" | "arrivals" | "inhouse" | "search";
 
 const NAV: { key: View; label: string; roles: string[] }[] = [
   { key: "dashboard", label: "Dashboard", roles: ["FRONT_DESK", "MANAGER", "ADMINISTRATOR", "CONTENT_ADMIN"] },
@@ -28,6 +29,16 @@ const NAV: { key: View; label: string; roles: string[] }[] = [
 export default function App() {
   const { loading, user, staff } = useAuth();
   const [view, setView] = useState<View>("dashboard");
+  // Set right before switching to "queue" so Queue mounts with the right tab
+  // already selected -- Queue is unmounted/remounted on every view switch
+  // (conditional render below, not kept alive), so a fresh initial state each
+  // time is enough; no need to keep this in sync afterwards.
+  const [queueInitialTab, setQueueInitialTab] = useState<QueueTab>("action");
+
+  function goToQueueTab(tab: QueueTab) {
+    setQueueInitialTab(tab);
+    setView("queue");
+  }
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-stone-400">Loading…</div>;
@@ -64,29 +75,35 @@ export default function App() {
   const availableNav = NAV.filter((n) => n.roles.includes(staff.role));
 
   return (
-    <div className="flex h-screen flex-col bg-stone-50">
-      <header className="titlebar-drag flex items-center justify-between border-b border-stone-200 bg-white px-4 py-2.5">
-        <div className="titlebar-no-drag flex items-center gap-2">
-          <span className="text-sm font-bold tracking-tight text-stone-900">Wellness Lodge</span>
-          <span className="text-xs text-stone-400">Front Desk &amp; Administration</span>
+    <div className="flex h-screen flex-col bg-ivory">
+      {/* Deep forest header (deepened from stone/emerald-700) with a thin
+          brass trim line underneath -- the single "gold line" hospitality
+          signature that ties the header to the calendar's brass accents
+          without adding gold anywhere status/payment colors already own. */}
+      <header className="titlebar-drag flex items-center justify-between border-b-2 border-brass-600 bg-gradient-to-b from-emerald-950 to-emerald-900 px-5 py-3 shadow-sm">
+        <div className="titlebar-no-drag flex items-baseline gap-2.5">
+          <span className="font-display text-base font-semibold tracking-tight text-white">Wellness Lodge</span>
+          <span className="text-xs text-emerald-200/70">Front Desk &amp; Administration</span>
         </div>
         <div className="titlebar-no-drag flex items-center gap-3 text-sm">
-          <span className="text-stone-600">
-            {staff.name} <span className="text-stone-400">({staff.role.replaceAll("_", " ")})</span>
+          <span className="text-emerald-100/90">
+            {staff.name} <span className="text-emerald-300/60">({staff.role.replaceAll("_", " ")})</span>
           </span>
-          <button onClick={() => signOut(auth)} className="text-stone-500 hover:text-stone-800">
+          <button onClick={() => signOut(auth)} className="text-emerald-200/70 transition hover:text-white">
             Sign out
           </button>
         </div>
       </header>
 
-      <nav className="flex gap-1 border-b border-stone-200 bg-white px-4 py-2">
+      <nav className="flex gap-1 border-b border-stone-200/80 bg-ivory px-4 py-2 shadow-[0_1px_0_rgba(28,25,23,0.02)]">
         {availableNav.map((n) => (
           <button
             key={n.key}
             onClick={() => setView(n.key)}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${
-              view === n.key ? "bg-emerald-700 text-white" : "text-stone-600 hover:bg-stone-100"
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              view === n.key
+                ? "bg-emerald-800 text-white shadow-sm ring-1 ring-brass-400/50"
+                : "text-stone-600 hover:bg-white"
             }`}
           >
             {n.label}
@@ -95,8 +112,14 @@ export default function App() {
       </nav>
 
       <main className="flex-1 overflow-y-auto">
-        {view === "dashboard" && <Dashboard role={staff.role} />}
-        {view === "queue" && <Queue role={staff.role} />}
+        {view === "dashboard" && (
+          <Dashboard
+            role={staff.role}
+            onGoToInHouse={() => goToQueueTab("inhouse")}
+            onGoToEnquiries={() => setView("enquiries")}
+          />
+        )}
+        {view === "queue" && <Queue role={staff.role} initialTab={queueInitialTab} />}
         {view === "enquiries" && <Enquiries />}
         {view === "rooms" && <AdminRooms />}
         {view === "reports" && <AdminReports />}

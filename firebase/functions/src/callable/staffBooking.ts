@@ -8,10 +8,28 @@ import {
   commitNightIncrement,
   commitNightTransition,
   readNightsInTxn,
+  readNights,
   releaseNights,
 } from "../lib/inventory";
-import { writeAudit } from "../lib/audit";
-import { nightsBetween, addHoursIso, type Booking, type RoomCategory, type LodgeSettings } from "@wellness-lodge/shared";
+import { writeAudit, writeAuditNow } from "../lib/audit";
+import {
+  RESEND_API_KEY,
+  sendBookingConfirmedEmail,
+  sendReceiptRejectedEmail,
+  sendBookingCancelledEmail,
+} from "../lib/mail";
+import {
+  nightsBetween,
+  addHoursIso,
+  computePriceSnapshot,
+  generateBookingRef,
+  isValidDateStr,
+  todayStr,
+  type Booking,
+  type RoomCategory,
+  type RatePeriod,
+  type LodgeSettings,
+} from "@wellness-lodge/shared";
 
 const refSchema = z.object({ bookingRef: z.string().min(4) });
 
@@ -21,7 +39,7 @@ const refSchema = z.object({ bookingRef: z.string().min(4) });
  * hold and displays the exact expiry time"), and the first time inventory
  * is actually locked for this booking.
  */
-export const acceptPayAtDesk = onCall({ cors: true }, async (req) => {
+export const acceptPayAtDesk = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
@@ -82,7 +100,7 @@ const confirmSchema = z.object({ bookingRef: z.string().min(4), note: z.string()
  * marking the payment as verified" is a manual, off-system step the desk
  * performs before calling this.
  */
-export const confirmBooking = onCall({ cors: true }, async (req) => {
+export const confirmBooking = onCall({ cors: true, invoker: "public", secrets: [RESEND_API_KEY] }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
@@ -149,6 +167,13 @@ export const confirmBooking = onCall({ cors: true }, async (req) => {
   );
   if (!receiptsSnap.empty) await batch.commit();
 
+  // Guest-facing courtesy notification -- re-read post-transaction rather
+  // than threading the txn-scoped `booking` variable out, and never allowed
+  // to fail this call (see lib/mail.ts): the confirmation itself is already
+  // durably saved above regardless of whether the email goes out.
+  const confirmedSnap = await bookingDoc.get();
+  await sendBookingConfirmedEmail(confirmedSnap.data() as Booking);
+
   return { ok: true };
 });
 
@@ -158,7 +183,7 @@ const rejectSchema = z.object({
 });
 
 /** Staff rejects a submitted receipt — asks the guest for a clearer one. No inventory change: bank-transfer bookings are never locked before verification. */
-export const rejectReceipt = onCall({ cors: true }, async (req) => {
+export const rejectReceipt = onCall({ cors: true, invoker: "public", secrets: [RESEND_API_KEY] }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
@@ -196,13 +221,16 @@ export const rejectReceipt = onCall({ cors: true }, async (req) => {
   );
   if (!receiptsSnap.empty) await batch.commit();
 
+  const rejectedSnap = await bookingDoc.get();
+  await sendReceiptRejectedEmail(rejectedSnap.data() as Booking, reason);
+
   return { ok: true };
 });
 
 const cancelSchema = z.object({ bookingRef: z.string().min(4), reason: z.string().min(3).max(500) });
 
 /** Staff cancels a booking — releases inventory if it was locked. Overrides are always reasoned + audited. */
-export const cancelBooking = onCall({ cors: true }, async (req) => {
+export const cancelBooking = onCall({ cors: true, invoker: "public", secrets: [RESEND_API_KEY] }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
@@ -251,12 +279,15 @@ export const cancelBooking = onCall({ cors: true }, async (req) => {
     });
   });
 
+  const cancelledSnap = await bookingDoc.get();
+  await sendBookingCancelledEmail(cancelledSnap.data() as Booking, reason);
+
   return { ok: true };
 });
 
 const checkInOutSchema = z.object({ bookingRef: z.string().min(4), roomId: z.string().optional() });
 
-export const checkInGuest = onCall({ cors: true }, async (req) => {
+export const checkInGuest = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
@@ -281,7 +312,7 @@ export const checkInGuest = onCall({ cors: true }, async (req) => {
   return { ok: true };
 });
 
-export const checkOutGuest = onCall({ cors: true }, async (req) => {
+export const checkOutGuest = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const staff = await loadActiveStaff(req.auth.uid);
   assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
@@ -316,4 +347,135 @@ export const checkOutGuest = onCall({ cors: true }, async (req) => {
     });
   });
   return { ok: true };
+});
+
+const guestInputSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email(),
+  phone: z.string().min(5).max(30),
+  // .nullish() not .optional(): Firebase's callable SDK turns an `undefined`
+  // field into `null` on the wire, so a blank notes box arrives as `null`,
+  // not a missing key. .optional() alone rejects that with "expected string,
+  // received null" — confirmed live via this exact crash.
+  notes: z.string().max(1000).nullish(),
+});
+
+const createWalkInSchema = z.object({
+  categoryId: z.string().min(1),
+  checkIn: z.string().refine(isValidDateStr, "Invalid date, expected YYYY-MM-DD"),
+  checkOut: z.string().refine(isValidDateStr, "Invalid date, expected YYYY-MM-DD"),
+  adults: z.number().int().min(1).max(20),
+  children: z.number().int().min(0).max(20),
+  guest: guestInputSchema,
+  paymentMethod: z.enum(["BANK_TRANSFER", "PAY_AT_FRONT_DESK"]),
+  source: z.enum(["WALK_IN", "PHONE"]),
+});
+
+/**
+ * Front desk creates a booking on behalf of a guest who walked in or called
+ * in — the data model already had a slot for this (`source: WALK_IN | PHONE`)
+ * but no function ever wrote one. Deliberately mirrors createBooking
+ * (guestBooking.ts) field-for-field — same advisory availability check, same
+ * price snapshot, same status assignment — so the result drops straight into
+ * the existing accept/confirm/check-in flow with no new state-machine
+ * branches. Inventory is NOT locked here, same as a guest booking; the lock
+ * still happens at acceptPayAtDesk / confirmBooking via the normal
+ * BookingDrawer actions.
+ */
+export const createWalkInBooking = onCall({ cors: true, invoker: "public" }, async (req) => {
+  requireSignedIn(req.auth);
+  const staff = await loadActiveStaff(req.auth.uid);
+  assertRole(staff, ["FRONT_DESK", "MANAGER", "ADMINISTRATOR"]);
+  const input = createWalkInSchema.parse(req.data);
+
+  if (input.checkOut <= input.checkIn) badRequest("Check-out must be after check-in.");
+  if (input.checkIn < todayStr()) badRequest("Check-in cannot be in the past.");
+
+  const [catSnap, ratesSnap, settingsSnap] = await Promise.all([
+    db.collection("roomCategories").doc(input.categoryId).get(),
+    db.collection("ratePeriods").where("categoryId", "==", input.categoryId).where("active", "==", true).get(),
+    db.collection("settings").doc("public").get(),
+  ]);
+  if (!catSnap.exists) notFound("Room category not found.");
+  const category = catSnap.data() as RoomCategory;
+  if (!category.active) badRequest("This room type is not currently available.");
+
+  const settings = (settingsSnap.exists ? settingsSnap.data() : {}) as Partial<LodgeSettings>;
+  const ratePeriods = ratesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as RatePeriod);
+
+  const price = computePriceSnapshot({
+    categoryId: input.categoryId,
+    categoryName: category.name,
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    adults: input.adults,
+    children: input.children,
+    baseOccupancy: category.maxAdults,
+    addOnsToea: 0,
+    ratePeriods,
+    gstEnabled: settings.gstEnabled ?? false,
+    gstPercent: settings.gstPercent ?? 10,
+    depositPercent: settings.depositPercent ?? 30,
+  });
+
+  // Advisory availability check (not a lock) — same as the public booking
+  // flow. The real lock happens later, at acceptPayAtDesk / confirmBooking.
+  const nights = nightsBetween(input.checkIn, input.checkOut);
+  const nightData = await readNights(input.categoryId, nights);
+  for (const date of nights) {
+    const d = nightData.get(date) ?? { held: 0, booked: 0 };
+    if (category.totalRooms - (d.held ?? 0) - (d.booked ?? 0) <= 0) {
+      badRequest(`No rooms of this type are available on ${date}. Please choose different dates.`);
+    }
+  }
+
+  const bookingRef = generateBookingRef();
+  const now = new Date().toISOString();
+  const receiptDeadlineHours = settings.receiptDeadlineHours ?? 48;
+
+  const booking: Booking = {
+    id: bookingRef,
+    bookingRef,
+    categoryId: input.categoryId,
+    roomId: null,
+    // Normalize the wire's `null` (Firebase's callable SDK sends undefined
+    // fields as null) back to `undefined` so the stored shape matches
+    // GuestDetails exactly, same as before this schema accepted null.
+    guest: { ...input.guest, notes: input.guest.notes ?? undefined },
+    guestNameLower: input.guest.name.trim().toLowerCase(),
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    nights: nights.length,
+    price,
+    paymentMethod: input.paymentMethod,
+    status: input.paymentMethod === "BANK_TRANSFER" ? "AWAITING_RECEIPT" : "AWAITING_FRONT_DESK",
+    paymentStatus: "UNPAID",
+    holdExpiresAt: null,
+    receiptDeadlineAt: input.paymentMethod === "BANK_TRANSFER" ? addHoursIso(receiptDeadlineHours) : null,
+    confirmedBy: null,
+    confirmedAt: null,
+    cancelledReason: null,
+    source: input.source,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await db.collection("bookings").doc(bookingRef).set(booking);
+  await writeAuditNow({
+    actorUid: staff.uid,
+    actorName: staff.name,
+    action: "booking.createWalkIn",
+    targetType: "booking",
+    targetId: bookingRef,
+    after: booking,
+  });
+
+  const bank = {
+    bankName: settings.bankName ?? "",
+    bankAccountName: settings.bankAccountName ?? "",
+    bankAccountNumber: settings.bankAccountNumber ?? "",
+    bankBranch: settings.bankBranch ?? "",
+  };
+
+  return { booking, bank };
 });

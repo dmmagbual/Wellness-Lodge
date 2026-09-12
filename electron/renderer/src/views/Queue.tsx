@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { collection, query, where, orderBy, limit, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
 import { notifyStaff, playAlertSound } from "@/lib/desktop";
 import { formatPGK, todayStr } from "@wellness-lodge/shared";
 import type { Booking, StaffRole } from "@wellness-lodge/shared";
-import { Badge, Card, EmptyState } from "@/components/ui";
+import { Badge, Card, EmptyState, PaymentStatusFlag } from "@/components/ui";
 import BookingDrawer from "@/components/BookingDrawer";
 
 const STATUS_TONE: Record<string, "amber" | "emerald" | "stone" | "red" | "blue"> = {
@@ -32,6 +32,7 @@ function BookingRow({ booking, onOpen }: { booking: Booking; onOpen: () => void 
         <div className="flex items-center gap-2">
           <p className="font-semibold text-stone-900">{booking.bookingRef}</p>
           <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replaceAll("_", " ")}</Badge>
+          <PaymentStatusFlag paymentStatus={booking.paymentStatus} />
         </div>
         <p className="truncate text-sm text-stone-600">
           {booking.guest.name} &middot; {booking.price.categoryName} &middot; {booking.checkIn} → {booking.checkOut}
@@ -42,12 +43,24 @@ function BookingRow({ booking, onOpen }: { booking: Booking; onOpen: () => void 
   );
 }
 
-export default function Queue({ role }: { role: StaffRole }) {
-  const [tab, setTab] = useState<Tab>("action");
+export default function Queue({ role, initialTab }: { role: StaffRole; initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "action");
   const [selected, setSelected] = useState<Booking | null>(null);
-  const [searchRef, setSearchRef] = useState("");
-  const [searchResult, setSearchResult] = useState<Booking | null | "not-found">(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<Booking[] | "not-found" | null>(null);
+  const [searching, setSearching] = useState(false);
   const knownIds = useRef<Set<string> | null>(null);
+  // Firestore's onSnapshot can deliver more than one update right after
+  // mount -- an incomplete/cache-only result before the authoritative
+  // server result lands -- so "the very first update is the real backlog"
+  // isn't reliable. Absorb every update that arrives in the first couple of
+  // seconds after mount into the baseline without alerting, THEN start
+  // treating new arrivals as new. Without this, every relaunch re-alerts on
+  // the entire existing backlog once the real (second) snapshot replaces an
+  // initial empty/partial one -- which is exactly why the sound kept
+  // repeating across restarts instead of only firing for genuinely new
+  // bookings.
+  const armed = useRef(false);
 
   const { data: needsAction } = useCollection<Booking>(
     () => query(collection(db, "bookings"), where("status", "in", ["AWAITING_FRONT_DESK", "HELD"]), orderBy("createdAt", "asc")),
@@ -70,27 +83,99 @@ export default function Queue({ role }: { role: StaffRole }) {
   );
 
   // Alerts: fire a native notification + sound the moment a NEW item lands
-  // in the needs-action queue (skip the very first load so opening the app
-  // doesn't alarm on the existing backlog).
+  // in the needs-action queue (skip the settling-in period below so opening
+  // the app doesn't alarm on the existing backlog).
   useEffect(() => {
-    if (knownIds.current === null) {
-      knownIds.current = new Set(needsAction.map((b) => b.id));
+    const currentIds = new Set(needsAction.map((b) => b.id));
+    if (!armed.current) {
+      knownIds.current = currentIds;
       return;
     }
     for (const b of needsAction) {
-      if (!knownIds.current.has(b.id)) {
+      if (!knownIds.current!.has(b.id)) {
         notifyStaff("New reservation request", `${b.bookingRef} — ${b.guest.name} (${b.price.categoryName})`);
         playAlertSound();
       }
     }
-    knownIds.current = new Set(needsAction.map((b) => b.id));
+    knownIds.current = currentIds;
   }, [needsAction]);
 
+  // Arms alerting 2s after mount, once Firestore's initial snapshot(s) have
+  // had time to settle -- see the comment on `armed` above.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      armed.current = true;
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
+
+  /**
+   * Matches by booking reference (exact id lookup), or by guest email, phone
+   * or name — whichever look-alike the term matches. Firestore has no
+   * case-insensitive or "contains" search built in: email/phone need an
+   * exact match against what the guest typed at booking time, and name only
+   * matches as a prefix (also case-sensitive). Good enough for a small front
+   * desk looking up a guest standing in front of them; not a full search
+   * engine — if that becomes a real pain point, a proper search index
+   * (Algolia/Typesense) is the right fix, not more client-side query hacks.
+   */
   async function handleSearch() {
-    const ref = searchRef.trim().toUpperCase();
-    if (!ref) return;
-    const snap = await getDoc(doc(db, "bookings", ref));
-    setSearchResult(snap.exists() ? ({ id: snap.id, ...snap.data() } as Booking) : "not-found");
+    const term = searchTerm.trim();
+    if (!term) return;
+    setSearching(true);
+    setSearchResults(null);
+    try {
+      const compact = term.replace(/\s+/g, "");
+      if (/^wl-?[a-z0-9]{4,}$/i.test(compact)) {
+        const snap = await getDoc(doc(db, "bookings", compact.toUpperCase()));
+        if (snap.exists()) {
+          setSearchResults([{ id: snap.id, ...snap.data() } as Booking]);
+          return;
+        }
+      }
+
+      const lookups: Promise<Booking[]>[] = [];
+      if (term.includes("@")) {
+        lookups.push(
+          getDocs(query(collection(db, "bookings"), where("guest.email", "==", term), limit(10))).then((snap) =>
+            snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Booking)
+          )
+        );
+      }
+      const digitsOnly = term.replace(/[^0-9+]/g, "");
+      if (digitsOnly.length >= 5) {
+        lookups.push(
+          getDocs(query(collection(db, "bookings"), where("guest.phone", "==", term), limit(10))).then((snap) =>
+            snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Booking)
+          )
+        );
+      }
+      // Case-insensitive: matched against guestNameLower (a lowercase copy
+      // stored at booking creation), not the display-cased guest.name.
+      // Bookings created before this field existed won't turn up here until
+      // they're re-saved -- an accepted gap, not silently hidden.
+      const nameLower = term.toLowerCase();
+      lookups.push(
+        getDocs(
+          query(
+            collection(db, "bookings"),
+            where("guestNameLower", ">=", nameLower),
+            where("guestNameLower", "<=", nameLower + ""),
+            limit(10)
+          )
+        ).then((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Booking))
+      );
+
+      const results = await Promise.all(lookups);
+      const merged = new Map<string, Booking>();
+      for (const list of results) {
+        for (const b of list) merged.set(b.id, b);
+      }
+      const final = Array.from(merged.values());
+      setSearchResults(final.length > 0 ? final : "not-found");
+    } finally {
+      setSearching(false);
+    }
   }
 
   const list = tab === "action" ? needsAction : tab === "arrivals" ? arrivals : tab === "inhouse" ? inHouse : recent;
@@ -123,23 +208,26 @@ export default function Queue({ role }: { role: StaffRole }) {
           <div className="flex max-w-md gap-2">
             <input
               className="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-              placeholder="Booking reference, e.g. WL-ABC123"
-              value={searchRef}
-              onChange={(e) => setSearchRef(e.target.value)}
+              placeholder="Reference, guest name, phone or email"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
             <button
               onClick={handleSearch}
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+              disabled={searching}
+              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
             >
-              Search
+              {searching ? "Searching…" : "Search"}
             </button>
           </div>
-          {searchResult === "not-found" && <p className="mt-3 text-sm text-red-600">No booking with that reference.</p>}
-          {searchResult && searchResult !== "not-found" && (
+          {searchResults === "not-found" && <p className="mt-3 text-sm text-red-600">No matching booking found.</p>}
+          {Array.isArray(searchResults) && (
             <div className="mt-4">
               <Card>
-                <BookingRow booking={searchResult} onOpen={() => setSelected(searchResult)} />
+                {searchResults.map((b) => (
+                  <BookingRow key={b.id} booking={b} onOpen={() => setSelected(b)} />
+                ))}
               </Card>
             </div>
           )}

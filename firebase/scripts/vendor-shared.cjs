@@ -57,7 +57,54 @@ if (pkg.dependencies["@wellness-lodge/shared"] !== newSpec) {
   console.log(`[vendor-shared] Updated functions/package.json dependency -> ${newSpec}`);
 }
 
-console.log("[vendor-shared] Reinstalling functions dependencies against the vendored tarball...");
+// npm's dependency resolution for a local `file:` tarball dependency is not
+// reliable here: its resolved spec string never changes (same version, same
+// tarball filename every run, since this package's version never bumps), and
+// depending on npm's own package-lock/content cache it can decide "nothing
+// to do" and silently keep a PREVIOUS extraction or cached resolution even
+// after node_modules/@wellness-lodge/shared is deleted and this run just
+// packed genuinely new content into the tarball. That has caused several
+// real bugs this session -- functions compiled and deployed successfully
+// against a stale copy of shared's types while shared/src had already moved
+// on, and it wasn't obvious until something broke in production.
+const vendoredModuleDir = path.join(functionsDir, "node_modules", "@wellness-lodge", "shared");
+if (fs.existsSync(vendoredModuleDir)) {
+  console.log("[vendor-shared] Removing previously-extracted @wellness-lodge/shared...");
+  fs.rmSync(vendoredModuleDir, { recursive: true, force: true });
+}
+
+// functions/package-lock.json is NOT in firebase.json's functions ignore list,
+// so it gets uploaded to Cloud Build right alongside the vendor tarball, and
+// Cloud Build's own npm install verifies the tarball's real bytes against the
+// sha512 integrity hash recorded in that lockfile. Because this tarball's
+// filename/version never changes, a plain local `npm install` does not
+// reliably rewrite that recorded hash when we repack genuinely new content
+// into it -- so a deploy can carry a lockfile still promising an OLDER
+// build's hash. Locally this is invisible (nothing here re-verifies it), but
+// Cloud Build enforces it strictly and fails the whole functions build with
+// EINTEGRITY. Deleting the lockfile here forces npm to regenerate it from
+// scratch against whatever tarball was *just* packed above, every run --
+// exactly the same "no stale cache layer survives" guarantee already applied
+// to node_modules/@wellness-lodge/shared below.
+const lockfilePath = path.join(functionsDir, "package-lock.json");
+if (fs.existsSync(lockfilePath)) {
+  console.log("[vendor-shared] Deleting functions/package-lock.json to force a fresh integrity hash...");
+  fs.rmSync(lockfilePath, { force: true });
+}
+
+console.log("[vendor-shared] Reinstalling functions dependencies (external packages)...");
 run("npm install --include=dev", functionsDir);
+
+// Belt-and-suspenders: rather than trust npm to have correctly re-resolved
+// OUR OWN package from the point above, extract the tarball we just packed
+// directly on top of node_modules/@wellness-lodge/shared ourselves. This
+// bypasses npm's caching entirely for this one internal package, so what
+// ends up in node_modules is always, unconditionally, exactly what's in the
+// tarball we just built -- no cache layer left that can serve something else.
+const tarballPath = path.join(vendorDir, tarballName);
+fs.rmSync(vendoredModuleDir, { recursive: true, force: true });
+fs.mkdirSync(vendoredModuleDir, { recursive: true });
+run(`tar -xzf "${tarballPath}" -C "${vendoredModuleDir}" --strip-components=1`, functionsDir);
+console.log(`[vendor-shared] Force-extracted ${tarballName} directly into node_modules/@wellness-lodge/shared.`);
 
 console.log("[vendor-shared] Done.");

@@ -13,7 +13,7 @@ const schema = z.object({ setupCode: z.string().min(1), name: z.string().min(2).
  * admin account is created without anyone having pre-existing admin access —
  * after that, every further staff account goes through createStaffUser.
  */
-export const bootstrapFirstAdmin = onCall({ cors: true }, async (req) => {
+export const bootstrapFirstAdmin = onCall({ cors: true, invoker: "public" }, async (req) => {
   requireSignedIn(req.auth);
   const { setupCode, name } = schema.parse(req.data);
 

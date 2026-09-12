@@ -40,3 +40,6 @@ export const callDeactivateStaffUser = httpsCallable(functions, "deactivateStaff
 export const callSaveRatePeriod = httpsCallable(functions, "saveRatePeriod");
 export const callOverrideBookingField = httpsCallable(functions, "overrideBookingField");
 export const callBootstrapFirstAdmin = httpsCallable(functions, "bootstrapFirstAdmin");
+export const callCreateWalkInBooking = httpsCallable(functions, "createWalkInBooking");
+export const callMarkRefundPending = httpsCallable(functions, "markRefundPending");
+export const callMarkRefunded = httpsCallable(functions, "markRefunded");

@@ -6,8 +6,16 @@ export {
   cancelBooking,
   checkInGuest,
   checkOutGuest,
+  createWalkInBooking,
 } from "./callable/staffBooking";
-export { createStaffUser, deactivateStaffUser, saveRatePeriod, overrideBookingField } from "./callable/adminOps";
+export {
+  createStaffUser,
+  deactivateStaffUser,
+  saveRatePeriod,
+  overrideBookingField,
+  markRefundPending,
+  markRefunded,
+} from "./callable/adminOps";
 export { submitEnquiry } from "./callable/enquiries";
 export { bootstrapFirstAdmin } from "./callable/bootstrap";
 export { expireHolds } from "./scheduled/expireHolds";
