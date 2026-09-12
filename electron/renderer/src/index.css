@@ -60,3 +60,25 @@ body {
 .titlebar-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* New-reservation banner: a slow, gentle background pulse so the bar reads
+   as "actively alerting" without being a strobing distraction. */
+@keyframes alert-banner-pulse {
+  0%,
+  100% {
+    background-color: #dc2626; /* red-600 */
+  }
+  50% {
+    background-color: #b91c1c; /* red-700 */
+  }
+}
+
+.alert-banner-pulse {
+  animation: alert-banner-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-banner-pulse {
+    animation: none;
+  }
+}

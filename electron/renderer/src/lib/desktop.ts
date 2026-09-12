@@ -9,6 +9,8 @@ declare global {
     wellnessLodge?: {
       notify: (title: string, body: string) => void;
       playAlert: () => void;
+      startAlertLoop: () => void;
+      stopAlertLoop: () => void;
       appVersion: () => Promise<string>;
     };
   }
@@ -43,5 +45,44 @@ export function playAlertSound(): void {
     void audio.play();
   } catch {
     // Sound is a courtesy, never block on it.
+  }
+}
+
+// Soft, repeating ring for "a new reservation is sitting unacknowledged" --
+// distinct from the one-shot playAlertSound() above. alert.wav is a short
+// (~0.36s) chime, so looping it back-to-back would sound like a rapid buzz
+// rather than a soft ring; replaying it every 2.5s instead gives a gentle,
+// spaced-out ring that keeps going until dismissed. Idempotent: calling
+// startAlertLoop() while it's already running does nothing extra.
+let loopTimer: ReturnType<typeof setInterval> | null = null;
+
+function ringOnce(): void {
+  try {
+    const a = new Audio("./alert.wav");
+    a.volume = 0.6;
+    void a.play();
+  } catch {
+    // Sound is a courtesy, never block on it.
+  }
+}
+
+export function startAlertLoop(): void {
+  if (window.wellnessLodge) {
+    window.wellnessLodge.startAlertLoop();
+    return;
+  }
+  if (loopTimer) return;
+  ringOnce();
+  loopTimer = setInterval(ringOnce, 2500);
+}
+
+export function stopAlertLoop(): void {
+  if (window.wellnessLodge) {
+    window.wellnessLodge.stopAlertLoop();
+    return;
+  }
+  if (loopTimer) {
+    clearInterval(loopTimer);
+    loopTimer = null;
   }
 }

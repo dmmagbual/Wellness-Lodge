@@ -2,6 +2,8 @@ import { useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/useAuth";
+import { useNeedsActionAlert } from "@/lib/useNeedsActionAlert";
+import NewReservationBanner from "@/components/NewReservationBanner";
 import Login from "@/views/Login";
 import Dashboard from "@/views/Dashboard";
 import Queue from "@/views/Queue";
@@ -34,6 +36,11 @@ export default function App() {
   // (conditional render below, not kept alive), so a fresh initial state each
   // time is enough; no need to keep this in sync afterwards.
   const [queueInitialTab, setQueueInitialTab] = useState<QueueTab>("action");
+  // Always-on, regardless of which screen is showing -- see the hook's own
+  // comment for why this can't just live inside the Queue view.
+  const { pending: pendingReservations, acknowledge: acknowledgeReservations } = useNeedsActionAlert(
+    !!(user && staff && staff.active)
+  );
 
   function goToQueueTab(tab: QueueTab) {
     setQueueInitialTab(tab);
@@ -76,6 +83,13 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col bg-ivory">
+      <NewReservationBanner
+        count={pendingReservations.length}
+        onAcknowledge={() => {
+          acknowledgeReservations();
+          goToQueueTab("action");
+        }}
+      />
       {/* Deep forest header (deepened from stone/emerald-700) with a thin
           brass trim line underneath -- the single "gold line" hospitality
           signature that ties the header to the calendar's brass accents

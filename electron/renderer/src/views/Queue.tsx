@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { collection, query, where, orderBy, limit, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
-import { notifyStaff, playAlertSound } from "@/lib/desktop";
 import { useRoomCategories } from "@/lib/useRoomCategories";
 import { formatPGK, todayStr } from "@wellness-lodge/shared";
 import type { Booking, StaffRole } from "@wellness-lodge/shared";
@@ -63,19 +62,12 @@ export default function Queue({ role, initialTab }: { role: StaffRole; initialTa
   const [searchResults, setSearchResults] = useState<Booking[] | "not-found" | null>(null);
   const [searching, setSearching] = useState(false);
   const { byId: categoriesById } = useRoomCategories();
-  const knownIds = useRef<Set<string> | null>(null);
-  // Firestore's onSnapshot can deliver more than one update right after
-  // mount -- an incomplete/cache-only result before the authoritative
-  // server result lands -- so "the very first update is the real backlog"
-  // isn't reliable. Absorb every update that arrives in the first couple of
-  // seconds after mount into the baseline without alerting, THEN start
-  // treating new arrivals as new. Without this, every relaunch re-alerts on
-  // the entire existing backlog once the real (second) snapshot replaces an
-  // initial empty/partial one -- which is exactly why the sound kept
-  // repeating across restarts instead of only firing for genuinely new
-  // bookings.
-  const armed = useRef(false);
 
+  // Note: alerting (native notification + the persistent ring/banner) for
+  // new arrivals in this same query now lives in useNeedsActionAlert, always
+  // mounted at the App root -- not here, since this view isn't always on
+  // screen. This query stays local only to drive the "Needs action (N)" tab
+  // and its list.
   const { data: needsAction } = useCollection<Booking>(
     () => query(collection(db, "bookings"), where("status", "in", ["AWAITING_FRONT_DESK", "HELD"]), orderBy("createdAt", "asc")),
     []
@@ -95,33 +87,6 @@ export default function Queue({ role, initialTab }: { role: StaffRole; initialTa
     () => query(collection(db, "bookings"), orderBy("createdAt", "desc"), limit(25)),
     []
   );
-
-  // Alerts: fire a native notification + sound the moment a NEW item lands
-  // in the needs-action queue (skip the settling-in period below so opening
-  // the app doesn't alarm on the existing backlog).
-  useEffect(() => {
-    const currentIds = new Set(needsAction.map((b) => b.id));
-    if (!armed.current) {
-      knownIds.current = currentIds;
-      return;
-    }
-    for (const b of needsAction) {
-      if (!knownIds.current!.has(b.id)) {
-        notifyStaff("New reservation request", `${b.bookingRef} — ${b.guest.name} (${b.price.categoryName})`);
-        playAlertSound();
-      }
-    }
-    knownIds.current = currentIds;
-  }, [needsAction]);
-
-  // Arms alerting 2s after mount, once Firestore's initial snapshot(s) have
-  // had time to settle -- see the comment on `armed` above.
-  useEffect(() => {
-    const t = setTimeout(() => {
-      armed.current = true;
-    }, 2000);
-    return () => clearTimeout(t);
-  }, []);
 
   /**
    * Matches by booking reference (exact id lookup), or by guest email, phone
