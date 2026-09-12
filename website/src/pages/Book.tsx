@@ -45,71 +45,71 @@ function SelectedRoomPanel({
           <PhotoImg
             src={ROOM_IMAGES[category.slug]?.[0] ?? ROOM_IMAGE_FALLBACK}
             alt={category.name}
-            ratio="aspect-[4/3]"
+            ratio="aspect-[16/11]"
           />
         ) : (
-          <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 text-sm text-stone-400">
+          <div className="flex aspect-[16/11] items-center justify-center bg-stone-100 text-sm text-stone-400">
             Choose a room type
           </div>
         )}
-        <div className="p-5">
+        <div className="p-7">
           <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase">Your room</p>
           {category ? (
             <>
-              <h3 className="mt-1 font-serif text-xl font-semibold text-stone-900">{category.name}</h3>
-              <p className="mt-1 text-xs text-stone-500">
+              <h3 className="mt-1.5 font-serif text-2xl font-semibold text-stone-900">{category.name}</h3>
+              <p className="mt-1.5 text-sm text-stone-500">
                 Sleeps up to {category.maxOccupancy} &middot; {category.bedType}
               </p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {category.amenities.slice(0, 4).map((a) => (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {category.amenities.slice(0, 5).map((a) => (
                   <Pill key={a}>{a}</Pill>
                 ))}
               </div>
               {quote ? (
-                <dl className="mt-4 space-y-1.5 border-t border-stone-100 pt-4 text-sm">
+                <dl className="mt-5 space-y-2 border-t border-stone-100 pt-5 text-base">
                   <div className="flex justify-between">
                     <dt className="text-stone-500">
                       {quote.nights.length} night{quote.nights.length > 1 ? "s" : ""}
                     </dt>
                     <dd className="font-medium text-stone-900">{formatPGK(quote.totalToea)}</dd>
                   </div>
-                  <div className="flex justify-between text-stone-500">
+                  <div className="flex justify-between text-sm text-stone-500">
                     <dt>Deposit due now</dt>
                     <dd>{formatPGK(quote.depositToea)}</dd>
                   </div>
                 </dl>
               ) : (
-                <p className="mt-4 text-xs text-stone-500">Pick your dates to see a live price here.</p>
+                <p className="mt-5 text-sm text-stone-500">Pick your dates to see a live price here.</p>
               )}
             </>
           ) : (
-            <p className="mt-1 text-sm text-stone-500">Pick a room type to see it here.</p>
+            <p className="mt-1.5 text-sm text-stone-500">Pick a room type to see it here.</p>
           )}
         </div>
       </Card>
 
-      <Card className="mt-6 p-5">
-        <p className="font-semibold text-stone-900">Why book direct</p>
-        <ul className="mt-3 space-y-2.5 text-sm text-stone-600">
-          <li className="flex gap-2">
+      <Card className="mt-6 p-7">
+        <p className="text-lg font-semibold text-stone-900">Why book direct</p>
+        <ul className="mt-4 space-y-3.5 text-sm text-stone-600">
+          <li className="flex gap-2.5">
             <CheckIcon />
             Best available rate — no third-party mark-up
           </li>
-          <li className="flex gap-2">
+          <li className="flex gap-2.5">
             <CheckIcon />
             Only a {depositPercent}% deposit — the rest is due at check-in
           </li>
-          <li className="flex gap-2">
+          <li className="flex gap-2.5">
             <CheckIcon />
             Pay by bank transfer or at the front desk
           </li>
-          <li className="flex gap-2">
+          <li className="flex gap-2.5">
             <CheckIcon />
             Confirmed by our front desk, not an algorithm
           </li>
         </ul>
-        <div className="mt-4 flex items-center gap-2 border-t border-stone-100 pt-4 text-sm">
-          <span className="font-semibold text-stone-900">4.9★</span>
+        <div className="mt-5 flex items-center gap-2 border-t border-stone-100 pt-5 text-sm">
+          <span className="text-lg font-semibold text-stone-900">4.9★</span>
           <span className="text-stone-500">average guest rating</span>
         </div>
       </Card>
@@ -256,7 +256,7 @@ export default function Book() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
+    <div className="mx-auto max-w-7xl px-4 py-12">
       <div className="mx-auto max-w-3xl">
         <SectionHeading eyebrow="Reserve" title="Book Your Stay" />
 
@@ -285,7 +285,7 @@ export default function Book() {
         </ol>
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-start">
+      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_460px] lg:items-start">
       <div className="mx-auto w-full max-w-2xl lg:mx-0">
       {step === 1 && (
         <Card className="mt-8 p-6">
