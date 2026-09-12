@@ -112,21 +112,36 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="mt-16 border-t border-stone-200 bg-white">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-4">
+      <footer className="mt-16 bg-[#06170f] text-emerald-100/80">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:grid-cols-4">
           <div className="md:col-span-2">
-            <img src={logo} alt="The Wellness Lodge" className="h-14 w-auto" />
-            <p className="mt-3 max-w-sm text-sm text-stone-600">
+            <img src={logo} alt="The Wellness Lodge" className="h-14 w-auto brightness-0 invert" />
+            <p className="mt-4 max-w-sm text-sm leading-relaxed">
               Comfortable lodging, car rental, function hall and event hire in Papua New Guinea.
               Rest. Recharge. Reconnect.
             </p>
+            <div className="mt-5 flex gap-3">
+              {["facebook", "instagram"].map((s) => (
+                <span
+                  key={s}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-emerald-200/70"
+                  aria-hidden="true"
+                >
+                  {s === "facebook" ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-8.5H16l.5-3.2h-3V7.2c0-.9.3-1.5 1.6-1.5H16.6V2.8C16.3 2.8 15.3 2.7 14.2 2.7c-2.3 0-3.9 1.4-3.9 4v2.6H7.8v3.2h2.5V21h3.2Z"/></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1"/></svg>
+                  )}
+                </span>
+              ))}
+            </div>
           </div>
           <div>
-            <p className="font-semibold">Explore</p>
-            <ul className="mt-2 space-y-1 text-sm">
+            <p className="font-semibold text-white">Explore</p>
+            <ul className="mt-3 space-y-1.5 text-sm">
               {FOOTER_LINKS.map((l) => (
                 <li key={l.href}>
-                  <Link to={l.href} className="text-stone-600 hover:text-emerald-700">
+                  <Link to={l.href} className="transition hover:text-white">
                     {l.label}
                   </Link>
                 </li>
@@ -134,20 +149,20 @@ export default function Layout() {
             </ul>
           </div>
           <div>
-            <p className="font-semibold">Lodge desk</p>
-            <ul className="mt-2 space-y-1 text-sm text-stone-600">
+            <p className="font-semibold text-white">Lodge desk</p>
+            <ul className="mt-3 space-y-1.5 text-sm">
               <li>Contact details: to be confirmed</li>
               <li>All rates shown in PGK (Kina)</li>
               <li>
-                <Link to="/policies" className="hover:text-emerald-700">
+                <Link to="/policies" className="transition hover:text-white">
                   Policies &amp; FAQ
                 </Link>
               </li>
             </ul>
           </div>
         </div>
-        <div className="border-t border-stone-100">
-          <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 text-xs text-stone-500 md:flex-row md:items-center md:justify-between">
+        <div className="border-t border-white/10">
+          <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 text-xs text-emerald-200/60 md:flex-row md:items-center md:justify-between">
             <p>&copy; {year} Wellness Lodge. All rights reserved.</p>
             <p>Payments by bank transfer or pay at front desk.</p>
           </div>

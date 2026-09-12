@@ -4,6 +4,9 @@ import { fetchRoomCategories, fetchRatePeriods, fetchSettings } from "@/lib/data
 import type { RoomCategory, RatePeriod, LodgeSettings, PriceSnapshot } from "@wellness-lodge/shared";
 import { formatPGK, todayStr, computePriceSnapshot } from "@wellness-lodge/shared";
 import { Card, Pill, SectionHeading, SampleTag, Field, PrimaryButton, inputClass } from "@/components/ui";
+import PhotoImg from "@/components/PhotoImg";
+import Gallery from "@/components/Gallery";
+import { ROOM_IMAGES, ROOM_IMAGE_FALLBACK } from "@/lib/media";
 
 function offsetDateStr(days: number): string {
   const d = new Date(todayStr() + "T00:00:00Z");
@@ -82,7 +85,7 @@ export default function Rooms() {
       <SectionHeading
         eyebrow="Accommodation"
         title="Rooms & Rates"
-        subtitle="All rates shown in PGK (Kina). Final photos and descriptions pending lodge-approved content."
+        subtitle="All rates shown in PGK (Kina). Sample photos shown below — final photography pending lodge-approved content."
       />
       <div className="mt-3 flex justify-center">
         <SampleTag />
@@ -152,11 +155,18 @@ export default function Rooms() {
 
       {/* Results */}
       <div className="mt-10 space-y-5">
-        {results.map(({ room, fitsParty, quote, error }) => (
+        {results.map(({ room, fitsParty, quote, error }) => {
+          const photos = ROOM_IMAGES[room.slug] ?? [ROOM_IMAGE_FALLBACK];
+          return (
           <Card key={room.id} className="overflow-hidden">
             <div className="flex flex-col sm:flex-row">
-              <div className="flex h-44 items-center justify-center bg-emerald-50 text-sm font-medium text-emerald-700 sm:h-auto sm:w-56 sm:shrink-0">
-                Photo pending
+              <div className="relative h-56 sm:h-auto sm:w-64 sm:shrink-0">
+                <PhotoImg src={photos[0]} alt={room.name} className="h-full" />
+                {photos.length > 1 && (
+                  <span className="absolute right-2 bottom-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+                    +{photos.length - 1} more
+                  </span>
+                )}
               </div>
               <div className="flex flex-1 flex-col justify-between gap-4 p-5 sm:flex-row">
                 <div className="min-w-0 flex-1">
@@ -170,6 +180,16 @@ export default function Rooms() {
                       <Pill key={a}>{a}</Pill>
                     ))}
                   </div>
+                  {photos.length > 1 && (
+                    <details className="mt-3 group/gallery">
+                      <summary className="cursor-pointer text-xs font-semibold text-emerald-700 hover:text-emerald-800">
+                        View photos
+                      </summary>
+                      <div className="mt-3">
+                        <Gallery images={photos} altPrefix={room.name} className="sm:grid-cols-4" />
+                      </div>
+                    </details>
+                  )}
                   {!fitsParty && (
                     <p className="mt-3 text-xs font-medium text-amber-700">
                       This room sleeps up to {room.maxOccupancy} guests — reduce your party size to see rates.
@@ -214,7 +234,8 @@ export default function Rooms() {
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {!loading && rooms.length === 0 && (

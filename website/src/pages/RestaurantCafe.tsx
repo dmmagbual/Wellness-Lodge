@@ -4,6 +4,8 @@ import type { MenuItem } from "@wellness-lodge/shared";
 import { formatPGK } from "@wellness-lodge/shared";
 import { Card, SectionHeading, SampleTag } from "@/components/ui";
 import EnquiryForm from "@/components/EnquiryForm";
+import PhotoImg from "@/components/PhotoImg";
+import { HERO_IMAGES, RESTAURANT_IMAGES } from "@/lib/media";
 
 export default function RestaurantCafe() {
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -16,6 +18,11 @@ export default function RestaurantCafe() {
   const cafe = menu.filter((m) => m.outlet === "CAFE");
 
   return (
+    <div>
+      <div className="relative h-48 overflow-hidden sm:h-64">
+        <img src={HERO_IMAGES.restaurant} alt="Restaurant at Wellness Lodge" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+      </div>
     <div className="mx-auto max-w-5xl px-4 py-12">
       <SectionHeading
         eyebrow="On site dining"
@@ -24,6 +31,12 @@ export default function RestaurantCafe() {
       />
       <div className="mt-3 flex justify-center">
         <SampleTag />
+      </div>
+
+      <div className="mt-8 grid grid-cols-3 gap-3">
+        {RESTAURANT_IMAGES.map((src, i) => (
+          <PhotoImg key={i} src={src} alt="Dish at Wellness Lodge" ratio="aspect-square" className="rounded-xl" />
+        ))}
       </div>
 
       <div className="mt-10 grid gap-10 md:grid-cols-2">
@@ -60,6 +73,7 @@ export default function RestaurantCafe() {
       <div className="mt-12 max-w-2xl">
         <EnquiryForm type="RESTAURANT_CAFE" title="Table booking or catering enquiry" />
       </div>
+    </div>
     </div>
   );
 }

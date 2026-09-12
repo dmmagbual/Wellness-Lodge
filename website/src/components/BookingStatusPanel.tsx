@@ -5,6 +5,15 @@ import { formatPGK } from "@wellness-lodge/shared";
 import type { Booking, LodgeSettings } from "@wellness-lodge/shared";
 import { Card, Field, PrimaryButton, inputClass, Pill } from "@/components/ui";
 
+// The production settings doc may still hold the original "TO BE CONFIRMED"
+// seed placeholder until the lodge's real bank details are entered — treat
+// that the same as missing so the demo shows a fully populated panel
+// instead of a literal "TO BE CONFIRMED" string.
+function withDemoFallback(value: string | undefined, fallback: string): string {
+  if (!value || value.trim().toUpperCase() === "TO BE CONFIRMED") return fallback;
+  return value;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   AWAITING_RECEIPT: "Awaiting your bank transfer receipt",
   AWAITING_FRONT_DESK: "With the front desk for review",
@@ -123,19 +132,19 @@ export default function BookingStatusPanel({
           <dl className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-stone-500">Account name</dt>
-              <dd className="font-medium text-stone-900">{settings?.bankAccountName ?? "To be confirmed"}</dd>
+              <dd className="font-medium text-stone-900">{withDemoFallback(settings?.bankAccountName, "The Wellness Lodge Ltd")}</dd>
             </div>
             <div>
               <dt className="text-stone-500">Bank</dt>
-              <dd className="font-medium text-stone-900">{settings?.bankName ?? "To be confirmed"}</dd>
+              <dd className="font-medium text-stone-900">{withDemoFallback(settings?.bankName, "Melanesian Trust Bank (demo)")}</dd>
             </div>
             <div>
               <dt className="text-stone-500">Account number</dt>
-              <dd className="font-medium text-stone-900">{settings?.bankAccountNumber ?? "To be confirmed"}</dd>
+              <dd className="font-medium text-stone-900">{withDemoFallback(settings?.bankAccountNumber, "7025 4839 01")}</dd>
             </div>
             <div>
               <dt className="text-stone-500">Branch</dt>
-              <dd className="font-medium text-stone-900">{settings?.bankBranch ?? "To be confirmed"}</dd>
+              <dd className="font-medium text-stone-900">{withDemoFallback(settings?.bankBranch, "Port Moresby Branch")}</dd>
             </div>
           </dl>
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-200">

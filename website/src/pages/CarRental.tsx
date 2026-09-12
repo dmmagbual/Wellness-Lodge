@@ -4,6 +4,8 @@ import type { CarRentalVehicle } from "@wellness-lodge/shared";
 import { formatPGK } from "@wellness-lodge/shared";
 import { Card, Pill, SectionHeading, SampleTag } from "@/components/ui";
 import EnquiryForm from "@/components/EnquiryForm";
+import PhotoImg from "@/components/PhotoImg";
+import { HERO_IMAGES, VEHICLE_IMAGES, VEHICLE_IMAGE_FALLBACK } from "@/lib/media";
 
 export default function CarRental() {
   const [fleet, setFleet] = useState<CarRentalVehicle[]>([]);
@@ -13,6 +15,11 @@ export default function CarRental() {
   }, []);
 
   return (
+    <div>
+      <div className="relative h-48 overflow-hidden sm:h-64">
+        <img src={HERO_IMAGES.carRental} alt="Car rental at Wellness Lodge" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+      </div>
     <div className="mx-auto max-w-6xl px-4 py-12">
       <SectionHeading
         eyebrow="Getting around"
@@ -26,9 +33,7 @@ export default function CarRental() {
       <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {fleet.map((v) => (
           <Card key={v.id} className="overflow-hidden">
-            <div className="flex h-32 items-center justify-center bg-emerald-50 text-xs font-medium text-emerald-700">
-              Photo pending
-            </div>
+            <PhotoImg src={VEHICLE_IMAGES[v.id] ?? VEHICLE_IMAGE_FALLBACK} alt={v.name} ratio="aspect-[4/3]" />
             <div className="p-5">
               <p className="font-semibold text-stone-900">{v.name}</p>
               <p className="text-xs text-stone-500">
@@ -49,6 +54,7 @@ export default function CarRental() {
       <div className="mt-12 max-w-2xl">
         <EnquiryForm type="CAR_RENTAL" title="Request a vehicle" />
       </div>
+    </div>
     </div>
   );
 }

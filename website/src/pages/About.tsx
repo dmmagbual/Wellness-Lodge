@@ -1,4 +1,5 @@
 import { SectionHeading, Card, SampleTag } from "@/components/ui";
+import { HERO_IMAGES } from "@/lib/media";
 
 const FACILITIES = [
   "Free Wi-Fi throughout the property",
@@ -13,6 +14,11 @@ const FACILITIES = [
 
 export default function About() {
   return (
+    <div>
+      <div className="relative h-56 overflow-hidden sm:h-72">
+        <img src={HERO_IMAGES.about} alt="Wellness Lodge exterior" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+      </div>
     <div className="mx-auto max-w-4xl px-4 py-12">
       <SectionHeading eyebrow="Our story" title="About Wellness Lodge" />
       <div className="mt-3 flex justify-center">
@@ -43,6 +49,7 @@ export default function About() {
           <p className="mt-3 text-xs text-stone-500">Sample list — confirm against the lodge's actual facilities.</p>
         </Card>
       </div>
+    </div>
     </div>
   );
 }
