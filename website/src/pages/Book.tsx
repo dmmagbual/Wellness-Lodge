@@ -11,9 +11,111 @@ import {
   type LodgeSettings,
   type PaymentMethod,
   type Booking,
+  type PriceSnapshot,
 } from "@wellness-lodge/shared";
-import { Card, Field, PrimaryButton, SecondaryButton, SectionHeading, inputClass } from "@/components/ui";
+import { Card, Field, Pill, PrimaryButton, SecondaryButton, SectionHeading, inputClass } from "@/components/ui";
 import BookingStatusPanel from "@/components/BookingStatusPanel";
+import PhotoImg from "@/components/PhotoImg";
+import { ROOM_IMAGES, ROOM_IMAGE_FALLBACK } from "@/lib/media";
+
+function CheckIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="mt-0.5 shrink-0 text-emerald-700">
+      <path d="M4 12.5 9.5 18 20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Sticky sidebar: the room the guest currently has selected (photo, specs,
+ * running price) plus a short trust panel — keeps the booking page from
+ * feeling like a bare form and reassures at the exact moment of decision. */
+function SelectedRoomPanel({
+  category,
+  quote,
+  depositPercent,
+}: {
+  category: RoomCategory | null;
+  quote: PriceSnapshot | null;
+  depositPercent: number;
+}) {
+  return (
+    <div className="w-full">
+      <Card className="overflow-hidden">
+        {category ? (
+          <PhotoImg
+            src={ROOM_IMAGES[category.slug]?.[0] ?? ROOM_IMAGE_FALLBACK}
+            alt={category.name}
+            ratio="aspect-[4/3]"
+          />
+        ) : (
+          <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 text-sm text-stone-400">
+            Choose a room type
+          </div>
+        )}
+        <div className="p-5">
+          <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase">Your room</p>
+          {category ? (
+            <>
+              <h3 className="mt-1 font-serif text-xl font-semibold text-stone-900">{category.name}</h3>
+              <p className="mt-1 text-xs text-stone-500">
+                Sleeps up to {category.maxOccupancy} &middot; {category.bedType}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {category.amenities.slice(0, 4).map((a) => (
+                  <Pill key={a}>{a}</Pill>
+                ))}
+              </div>
+              {quote ? (
+                <dl className="mt-4 space-y-1.5 border-t border-stone-100 pt-4 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-stone-500">
+                      {quote.nights.length} night{quote.nights.length > 1 ? "s" : ""}
+                    </dt>
+                    <dd className="font-medium text-stone-900">{formatPGK(quote.totalToea)}</dd>
+                  </div>
+                  <div className="flex justify-between text-stone-500">
+                    <dt>Deposit due now</dt>
+                    <dd>{formatPGK(quote.depositToea)}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="mt-4 text-xs text-stone-500">Pick your dates to see a live price here.</p>
+              )}
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-stone-500">Pick a room type to see it here.</p>
+          )}
+        </div>
+      </Card>
+
+      <Card className="mt-6 p-5">
+        <p className="font-semibold text-stone-900">Why book direct</p>
+        <ul className="mt-3 space-y-2.5 text-sm text-stone-600">
+          <li className="flex gap-2">
+            <CheckIcon />
+            Best available rate — no third-party mark-up
+          </li>
+          <li className="flex gap-2">
+            <CheckIcon />
+            Only a {depositPercent}% deposit — the rest is due at check-in
+          </li>
+          <li className="flex gap-2">
+            <CheckIcon />
+            Pay by bank transfer or at the front desk
+          </li>
+          <li className="flex gap-2">
+            <CheckIcon />
+            Confirmed by our front desk, not an algorithm
+          </li>
+        </ul>
+        <div className="mt-4 flex items-center gap-2 border-t border-stone-100 pt-4 text-sm">
+          <span className="font-semibold text-stone-900">4.9★</span>
+          <span className="text-stone-500">average guest rating</span>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -154,33 +256,37 @@ export default function Book() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
-      <SectionHeading eyebrow="Reserve" title="Book Your Stay" />
+    <div className="mx-auto max-w-6xl px-4 py-12">
+      <div className="mx-auto max-w-3xl">
+        <SectionHeading eyebrow="Reserve" title="Book Your Stay" />
 
-      {cameFromSearch && (
-        <p className="mt-3 text-center text-sm text-stone-500">
-          <Link to="/rooms" className="font-medium text-emerald-700 hover:text-emerald-800">
-            &larr; Edit search
-          </Link>
-        </p>
-      )}
+        {cameFromSearch && (
+          <p className="mt-3 text-center text-sm text-stone-500">
+            <Link to="/rooms" className="font-medium text-emerald-700 hover:text-emerald-800">
+              &larr; Edit search
+            </Link>
+          </p>
+        )}
 
-      <ol className="mt-8 flex items-center justify-center gap-2 text-xs font-medium text-stone-500">
-        {["Dates & room", "Confirm quote", "Your details"].map((label, i) => (
-          <li key={label} className={`flex items-center gap-2 ${i + 1 === step ? "text-emerald-700" : ""}`}>
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                i + 1 <= step ? "bg-emerald-700 text-white" : "bg-stone-200 text-stone-600"
-              }`}
-            >
-              {i + 1}
-            </span>
-            {label}
-            {i < 2 && <span className="mx-1 text-stone-300">&rarr;</span>}
-          </li>
-        ))}
-      </ol>
+        <ol className="mt-8 flex items-center justify-center gap-2 text-xs font-medium text-stone-500">
+          {["Dates & room", "Confirm quote", "Your details"].map((label, i) => (
+            <li key={label} className={`flex items-center gap-2 ${i + 1 === step ? "text-emerald-700" : ""}`}>
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                  i + 1 <= step ? "bg-emerald-700 text-white" : "bg-stone-200 text-stone-600"
+                }`}
+              >
+                {i + 1}
+              </span>
+              {label}
+              {i < 2 && <span className="mx-1 text-stone-300">&rarr;</span>}
+            </li>
+          ))}
+        </ol>
+      </div>
 
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-start">
+      <div className="mx-auto w-full max-w-2xl lg:mx-0">
       {step === 1 && (
         <Card className="mt-8 p-6">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -388,6 +494,16 @@ export default function Book() {
           </div>
         </Card>
       )}
+      </div>
+
+      <aside className="mx-auto w-full max-w-2xl lg:sticky lg:top-24 lg:mx-0 lg:max-w-none">
+        <SelectedRoomPanel
+          category={category}
+          quote={quote}
+          depositPercent={quote?.depositPercent ?? settings?.depositPercent ?? 30}
+        />
+      </aside>
+      </div>
     </div>
   );
 }
