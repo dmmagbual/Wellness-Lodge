@@ -2,6 +2,7 @@ import { useState } from "react";
 import { collection, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
+import { useRoomCategories } from "@/lib/useRoomCategories";
 import { formatPGK, todayStr } from "@wellness-lodge/shared";
 import type { Booking, Enquiry, RoomCategory, StaffRole } from "@wellness-lodge/shared";
 import { Badge, Card, EmptyState, PrimaryButton, PaymentStatusFlag, SectionHeading, OccupancyRing } from "@/components/ui";
@@ -18,6 +19,7 @@ import BookingDrawer from "@/components/BookingDrawer";
 import NewBookingModal from "@/components/NewBookingModal";
 import BookingCalendar from "@/components/BookingCalendar";
 import BookingsTable from "@/components/BookingsTable";
+import RoomThumb from "@/components/RoomThumb";
 
 const STATUS_TONE: Record<string, "amber" | "emerald" | "stone" | "red" | "blue"> = {
   AWAITING_RECEIPT: "amber",
@@ -100,21 +102,32 @@ function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function MiniRow({ booking, onOpen }: { booking: Booking; onOpen: () => void }) {
+function MiniRow({
+  booking,
+  images,
+  onOpen,
+}: {
+  booking: Booking;
+  images?: string[];
+  onOpen: () => void;
+}) {
   return (
     <button
       onClick={onOpen}
       className="flex w-full items-center justify-between gap-3 border-b border-stone-100 px-4 py-3 text-left last:border-b-0 hover:bg-stone-50"
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-semibold text-stone-900">{booking.bookingRef}</p>
-          <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replace(/_/g, " ")}</Badge>
-          <PaymentStatusFlag paymentStatus={booking.paymentStatus} />
+      <div className="flex min-w-0 items-center gap-3">
+        <RoomThumb images={images} size="sm" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-stone-900">{booking.bookingRef}</p>
+            <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replace(/_/g, " ")}</Badge>
+            <PaymentStatusFlag paymentStatus={booking.paymentStatus} />
+          </div>
+          <p className="truncate text-sm text-stone-600">
+            {booking.guest.name} &middot; {booking.price.categoryName} &middot; {formatPGK(booking.price.totalToea)}
+          </p>
         </div>
-        <p className="truncate text-sm text-stone-600">
-          {booking.guest.name} &middot; {booking.price.categoryName} &middot; {formatPGK(booking.price.totalToea)}
-        </p>
       </div>
       <p className="shrink-0 text-sm text-stone-500">
         {booking.checkIn} → {booking.checkOut}
@@ -130,6 +143,7 @@ function BookingList({
   bookings,
   emptyText,
   onOpen,
+  categoriesById,
 }: {
   title: string;
   icon?: React.ReactNode;
@@ -137,6 +151,7 @@ function BookingList({
   bookings: Booking[];
   emptyText: string;
   onOpen: (b: Booking) => void;
+  categoriesById: Map<string, RoomCategory>;
 }) {
   return (
     <div>
@@ -144,7 +159,7 @@ function BookingList({
       <Card>
         {bookings.length === 0 && <EmptyState>{emptyText}</EmptyState>}
         {bookings.map((b) => (
-          <MiniRow key={b.id} booking={b} onOpen={() => onOpen(b)} />
+          <MiniRow key={b.id} booking={b} images={categoriesById.get(b.categoryId)?.images} onOpen={() => onOpen(b)} />
         ))}
       </Card>
     </div>
@@ -240,6 +255,10 @@ export default function Dashboard({
   const totalRoomsCapacity = activeCategories.reduce((sum, c) => sum + (c.totalRooms || 0), 0);
   const occupancyPercent = totalRoomsCapacity > 0 ? Math.round((inHouse.length / totalRoomsCapacity) * 100) : 0;
 
+  // Full catalogue (not just active) so a booking against a since-retired
+  // category still resolves a name/photo -- see useRoomCategories.
+  const { byId: categoriesById } = useRoomCategories();
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -317,6 +336,7 @@ export default function Dashboard({
               bookings={overdueArrivals}
               emptyText="None."
               onOpen={setSelected}
+              categoriesById={categoriesById}
             />
           )}
 
@@ -329,6 +349,7 @@ export default function Dashboard({
                 bookings={arrivals}
                 emptyText="No arrivals today."
                 onOpen={setSelected}
+                categoriesById={categoriesById}
               />
             </div>
             <div id="departures-section">
@@ -339,6 +360,7 @@ export default function Dashboard({
                 bookings={departures}
                 emptyText="No departures today."
                 onOpen={setSelected}
+                categoriesById={categoriesById}
               />
             </div>
           </div>
@@ -351,6 +373,7 @@ export default function Dashboard({
               bookings={needsAction}
               emptyText="Nothing pending."
               onOpen={setSelected}
+              categoriesById={categoriesById}
             />
           </div>
 
@@ -364,6 +387,7 @@ export default function Dashboard({
               bookings={rejectedReceipts}
               emptyText="No rejected receipts."
               onOpen={setSelected}
+              categoriesById={categoriesById}
             />
           </div>
 
@@ -375,6 +399,7 @@ export default function Dashboard({
               bookings={refundsPending}
               emptyText="No refunds pending."
               onOpen={setSelected}
+              categoriesById={categoriesById}
             />
           </div>
 

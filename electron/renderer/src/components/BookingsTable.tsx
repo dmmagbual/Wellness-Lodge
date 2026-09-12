@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { collection, query, orderBy, limit as fsLimit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
+import { useRoomCategories } from "@/lib/useRoomCategories";
 import { formatPGK } from "@wellness-lodge/shared";
 import type { Booking } from "@wellness-lodge/shared";
 import { Badge, Card, EmptyState, PaymentStatusFlag, SectionHeading } from "@/components/ui";
 import { IconCalendar } from "@/components/icons";
+import RoomThumb from "@/components/RoomThumb";
 
 const STATUS_TONE: Record<string, "amber" | "emerald" | "stone" | "red" | "blue"> = {
   AWAITING_RECEIPT: "amber",
@@ -41,8 +44,18 @@ export default function BookingsTable({
     () => query(collection(db, "bookings"), orderBy("checkIn", "desc"), fsLimit(500)),
     []
   );
+  const { categories, byId: categoriesById } = useRoomCategories();
+  const [roomFilter, setRoomFilter] = useState<string | null>(null);
 
-  const rows = filterDate ? all.filter((b) => b.checkIn === filterDate) : all;
+  const dateFiltered = filterDate ? all.filter((b) => b.checkIn === filterDate) : all;
+  const rows = roomFilter ? dateFiltered.filter((b) => b.categoryId === roomFilter) : dateFiltered;
+
+  // Only offer room types that actually appear in the currently visible
+  // rows -- an empty filter bar when there's nothing to narrow down, and no
+  // dead options for categories with zero bookings in view.
+  const roomTypesInView = categories
+    .filter((c) => dateFiltered.some((b) => b.categoryId === c.id))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <div>
@@ -52,6 +65,30 @@ export default function BookingsTable({
         title={filterDate ? `Bookings arriving ${filterDate}` : "All bookings"}
         count={rows.length}
       />
+      {roomTypesInView.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setRoomFilter(null)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              !roomFilter ? "bg-emerald-800 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50"
+            }`}
+          >
+            All room types
+          </button>
+          {roomTypesInView.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setRoomFilter(roomFilter === c.id ? null : c.id)}
+              className={`flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-xs font-medium transition ${
+                roomFilter === c.id ? "bg-emerald-800 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50"
+              }`}
+            >
+              <RoomThumb images={c.images} size="sm" className="h-5 w-5 rounded-full" />
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
       <Card className="overflow-x-auto">
         {rows.length === 0 ? (
           <EmptyState>{filterDate ? "No arrivals on this date." : "No bookings yet."}</EmptyState>
@@ -76,7 +113,12 @@ export default function BookingsTable({
                 >
                   <td className="px-4 py-2.5 font-medium text-stone-900">{b.bookingRef}</td>
                   <td className="px-4 py-2.5 text-stone-700">{b.guest.name}</td>
-                  <td className="px-4 py-2.5 text-stone-600">{b.price.categoryName}</td>
+                  <td className="px-4 py-2.5 text-stone-600">
+                    <div className="flex items-center gap-2">
+                      <RoomThumb images={categoriesById.get(b.categoryId)?.images} size="sm" />
+                      <span>{b.price.categoryName}</span>
+                    </div>
+                  </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-stone-500">
                     {b.checkIn} → {b.checkOut}
                   </td>

@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { collection } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { collection, doc, getDoc, query, where } from "firebase/firestore";
 import { db, callCreateWalkInBooking } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
-import type { Booking, PaymentMethod, RoomCategory } from "@wellness-lodge/shared";
+import { computePriceSnapshot, formatPGK } from "@wellness-lodge/shared";
+import type { Booking, LodgeSettings, PaymentMethod, RatePeriod, RoomCategory } from "@wellness-lodge/shared";
 import { Field, PrimaryButton, SecondaryButton, inputClass } from "@/components/ui";
+import RoomPicker from "@/components/RoomPicker";
 
 /**
  * Front desk creates a booking for a walk-in guest or a phone call — the
@@ -25,6 +27,21 @@ export default function NewBookingModal({
   const { data: categories } = useCollection<RoomCategory>(() => collection(db, "roomCategories"), []);
   const activeCategories = categories.filter((c) => c.active).sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // Live estimate only -- uses the exact same computePriceSnapshot the
+  // website and createBooking/createWalkInBooking use server-side, so it
+  // can never disagree with the authoritative total that comes back once
+  // the booking is actually created. Rate periods + settings are read once
+  // (getDoc/one-shot query), same as this modal's other reference data --
+  // no need for a live subscription on values that rarely change mid-visit.
+  const { data: ratePeriods } = useCollection<RatePeriod>(
+    () => query(collection(db, "ratePeriods"), where("active", "==", true)),
+    []
+  );
+  const [settings, setSettings] = useState<LodgeSettings | null>(null);
+  useEffect(() => {
+    getDoc(doc(db, "settings", "public")).then((snap) => setSettings(snap.exists() ? (snap.data() as LodgeSettings) : null));
+  }, []);
+
   const [categoryId, setCategoryId] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -41,6 +58,35 @@ export default function NewBookingModal({
 
   const canSubmit =
     categoryId && checkIn && checkOut && checkOut > checkIn && name.trim() && email.trim() && phone.trim() && !busy;
+
+  const selectedCategory = activeCategories.find((c) => c.id === categoryId) ?? null;
+
+  // Read-only preview for the staff member's benefit while talking to the
+  // guest -- never sent anywhere. The real PriceSnapshot is computed fresh
+  // (and frozen onto the booking) by createWalkInBooking on submit.
+  const estimate = useMemo(() => {
+    if (!selectedCategory || !checkIn || !checkOut || checkOut <= checkIn) return null;
+    try {
+      return computePriceSnapshot({
+        categoryId: selectedCategory.id,
+        categoryName: selectedCategory.name,
+        checkIn,
+        checkOut,
+        adults: parseInt(adults || "1", 10),
+        children: parseInt(children || "0", 10),
+        baseOccupancy: selectedCategory.maxAdults,
+        ratePeriods,
+        gstEnabled: settings?.gstEnabled ?? false,
+        gstPercent: settings?.gstPercent ?? 10,
+        depositPercent: settings?.depositPercent ?? 30,
+      });
+    } catch {
+      // No active rate covers one of these nights -- stay silent rather than
+      // show a scary error for what's still just a preview; submit will
+      // surface the real error if the dates truly aren't priceable.
+      return null;
+    }
+  }, [selectedCategory, checkIn, checkOut, adults, children, ratePeriods, settings]);
 
   async function submit() {
     setBusy(true);
@@ -69,7 +115,7 @@ export default function NewBookingModal({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -98,14 +144,7 @@ export default function NewBookingModal({
           </Field>
 
           <Field label="Room type">
-            <select className={inputClass} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">Select a room type…</option>
-              {activeCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <RoomPicker categories={activeCategories} ratePeriods={ratePeriods} value={categoryId} onChange={setCategoryId} />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -116,6 +155,24 @@ export default function NewBookingModal({
               <input type="date" className={inputClass} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
             </Field>
           </div>
+
+          {estimate && (
+            <div className="rounded-xl bg-emerald-50 p-3 text-sm ring-1 ring-emerald-200">
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-emerald-900">
+                  Estimated total · {estimate.nights.length} night{estimate.nights.length === 1 ? "" : "s"}
+                </p>
+                <p className="font-display text-lg font-semibold text-emerald-900">{formatPGK(estimate.totalToea)}</p>
+              </div>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                Deposit due now {formatPGK(estimate.depositToea)} · Balance {formatPGK(estimate.balanceToea)}
+                {estimate.gstEnabled ? ` · incl. GST ${formatPGK(estimate.gstToea)}` : ""}
+              </p>
+              <p className="mt-1 text-[11px] text-emerald-700/70">
+                Estimate for staff reference — the confirmed total is set when this booking is created.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Adults">

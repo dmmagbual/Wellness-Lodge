@@ -13,9 +13,12 @@ import {
   callMarkRefunded,
 } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
+import { useRoomCategories } from "@/lib/useRoomCategories";
 import { formatPGK, INVENTORY_LOCKING_STATUSES } from "@wellness-lodge/shared";
 import type { AuditLogEntry, Booking, PaymentReceipt, StaffRole } from "@wellness-lodge/shared";
 import { Badge, Card, DangerButton, PrimaryButton, SecondaryButton, Field, inputClass, PaymentStatusFlag } from "@/components/ui";
+import RoomThumb from "@/components/RoomThumb";
+import RoomPhotoLightbox from "@/components/RoomPhotoLightbox";
 
 // Human-readable labels for the raw `action` strings written by writeAudit /
 // writeAuditNow (firebase/functions/src/lib/audit.ts). Falls back to the raw
@@ -84,6 +87,10 @@ export default function BookingDrawer({
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [showReasonFor, setShowReasonFor] = useState<"reject" | "cancel" | "refund" | null>(null);
+  const [showGallery, setShowGallery] = useState<number | null>(null);
+
+  const { byId: categoriesById } = useRoomCategories();
+  const category = categoriesById.get(booking.categoryId) ?? null;
 
   const { data: receipts } = useCollection<PaymentReceipt>(
     () => query(collection(db, "paymentReceipts"), where("bookingRef", "==", booking.bookingRef), orderBy("uploadedAt", "desc")),
@@ -134,6 +141,10 @@ export default function BookingDrawer({
           </button>
         </div>
 
+        {category?.images?.length ? (
+          <RoomThumb images={category.images} size="lg" className="rounded-none" onClick={() => setShowGallery(0)} />
+        ) : null}
+
         <div className="space-y-5 p-5">
           <Card className="p-4">
             <p className="font-semibold text-stone-900">{booking.guest.name}</p>
@@ -144,9 +155,24 @@ export default function BookingDrawer({
 
           <Card className="p-4">
             <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div>
+              <div className="col-span-2">
                 <dt className="text-stone-500">Room type</dt>
                 <dd className="font-medium text-stone-900">{booking.price.categoryName}</dd>
+                {category && (
+                  <p className="mt-0.5 text-xs text-stone-500">
+                    {category.bedType} · Sleeps {category.maxOccupancy}
+                    {category.sizeSqm ? ` · ${category.sizeSqm} m²` : ""}
+                  </p>
+                )}
+                {category?.amenities?.length ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {category.amenities.map((a) => (
+                      <span key={a} className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">
+                        {a}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div>
                 <dt className="text-stone-500">Nights</dt>
@@ -336,6 +362,16 @@ export default function BookingDrawer({
           )}
         </div>
       </div>
+
+      {showGallery !== null && category?.images?.length && (
+        <RoomPhotoLightbox
+          images={category.images}
+          index={showGallery}
+          title={category.name}
+          onClose={() => setShowGallery(null)}
+          onIndexChange={setShowGallery}
+        />
+      )}
     </div>
   );
 }

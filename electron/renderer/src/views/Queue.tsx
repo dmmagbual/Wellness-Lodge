@@ -3,10 +3,12 @@ import { collection, query, where, orderBy, limit, doc, getDoc, getDocs } from "
 import { db } from "@/lib/firebase";
 import { useCollection } from "@/lib/useCollection";
 import { notifyStaff, playAlertSound } from "@/lib/desktop";
+import { useRoomCategories } from "@/lib/useRoomCategories";
 import { formatPGK, todayStr } from "@wellness-lodge/shared";
 import type { Booking, StaffRole } from "@wellness-lodge/shared";
 import { Badge, Card, EmptyState, PaymentStatusFlag } from "@/components/ui";
 import BookingDrawer from "@/components/BookingDrawer";
+import RoomThumb from "@/components/RoomThumb";
 
 const STATUS_TONE: Record<string, "amber" | "emerald" | "stone" | "red" | "blue"> = {
   AWAITING_RECEIPT: "amber",
@@ -22,21 +24,32 @@ const STATUS_TONE: Record<string, "amber" | "emerald" | "stone" | "red" | "blue"
 
 type Tab = "action" | "arrivals" | "inhouse" | "search";
 
-function BookingRow({ booking, onOpen }: { booking: Booking; onOpen: () => void }) {
+function BookingRow({
+  booking,
+  images,
+  onOpen,
+}: {
+  booking: Booking;
+  images?: string[];
+  onOpen: () => void;
+}) {
   return (
     <button
       onClick={onOpen}
       className="flex w-full items-center justify-between gap-3 border-b border-stone-100 px-4 py-3 text-left last:border-b-0 hover:bg-stone-50"
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-semibold text-stone-900">{booking.bookingRef}</p>
-          <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replaceAll("_", " ")}</Badge>
-          <PaymentStatusFlag paymentStatus={booking.paymentStatus} />
+      <div className="flex min-w-0 items-center gap-3">
+        <RoomThumb images={images} size="sm" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-stone-900">{booking.bookingRef}</p>
+            <Badge tone={STATUS_TONE[booking.status] ?? "stone"}>{booking.status.replaceAll("_", " ")}</Badge>
+            <PaymentStatusFlag paymentStatus={booking.paymentStatus} />
+          </div>
+          <p className="truncate text-sm text-stone-600">
+            {booking.guest.name} &middot; {booking.price.categoryName} &middot; {booking.checkIn} → {booking.checkOut}
+          </p>
         </div>
-        <p className="truncate text-sm text-stone-600">
-          {booking.guest.name} &middot; {booking.price.categoryName} &middot; {booking.checkIn} → {booking.checkOut}
-        </p>
       </div>
       <p className="shrink-0 font-medium text-stone-900">{formatPGK(booking.price.totalToea)}</p>
     </button>
@@ -49,6 +62,7 @@ export default function Queue({ role, initialTab }: { role: StaffRole; initialTa
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<Booking[] | "not-found" | null>(null);
   const [searching, setSearching] = useState(false);
+  const { byId: categoriesById } = useRoomCategories();
   const knownIds = useRef<Set<string> | null>(null);
   // Firestore's onSnapshot can deliver more than one update right after
   // mount -- an incomplete/cache-only result before the authoritative
@@ -226,7 +240,7 @@ export default function Queue({ role, initialTab }: { role: StaffRole; initialTa
             <div className="mt-4">
               <Card>
                 {searchResults.map((b) => (
-                  <BookingRow key={b.id} booking={b} onOpen={() => setSelected(b)} />
+                  <BookingRow key={b.id} booking={b} images={categoriesById.get(b.categoryId)?.images} onOpen={() => setSelected(b)} />
                 ))}
               </Card>
             </div>
@@ -236,7 +250,7 @@ export default function Queue({ role, initialTab }: { role: StaffRole; initialTa
           <Card className="mt-2">
             {recent.length === 0 && <EmptyState>No bookings yet.</EmptyState>}
             {recent.map((b) => (
-              <BookingRow key={b.id} booking={b} onOpen={() => setSelected(b)} />
+              <BookingRow key={b.id} booking={b} images={categoriesById.get(b.categoryId)?.images} onOpen={() => setSelected(b)} />
             ))}
           </Card>
         </div>
@@ -244,7 +258,7 @@ export default function Queue({ role, initialTab }: { role: StaffRole; initialTa
         <Card className="mt-5">
           {list.length === 0 && <EmptyState>Nothing here right now.</EmptyState>}
           {list.map((b) => (
-            <BookingRow key={b.id} booking={b} onOpen={() => setSelected(b)} />
+            <BookingRow key={b.id} booking={b} images={categoriesById.get(b.categoryId)?.images} onOpen={() => setSelected(b)} />
           ))}
         </Card>
       )}
