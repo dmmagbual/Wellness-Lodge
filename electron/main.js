@@ -3,6 +3,11 @@ const path = require("node:path");
 
 const isDev = !app.isPackaged;
 
+// Tracked so the ipcMain handlers below can flash this specific window's
+// taskbar entry -- the OS-level equivalent of the in-app banner for when
+// the window is minimized and the banner literally can't be seen.
+let mainWindow = null;
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -16,6 +21,13 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Chromium throttles timers (setInterval/setTimeout) in a minimized or
+      // fully-occluded window to save power. The new-reservation ring runs
+      // on exactly that kind of timer, and the front desk may well minimize
+      // this window while doing something else -- it still needs to ring.
+      // Keeping it un-throttled is what makes "rings no matter what" true
+      // even then, not just while the window is visible on some tab.
+      backgroundThrottling: false,
     },
   });
 
@@ -25,6 +37,11 @@ function createWindow() {
   } else {
     win.loadFile(path.join(__dirname, "renderer", "dist", "index.html"));
   }
+
+  mainWindow = win;
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null;
+  });
 
   return win;
 }
@@ -53,6 +70,18 @@ ipcMain.on("notify", (_event, { title, body }) => {
   if (Notification.isSupported()) {
     new Notification({ title, body }).show();
   }
+});
+
+// Flashes the taskbar entry for this window -- Windows keeps flashing it
+// until the window is focused, regardless of minimized state, which is
+// exactly the "still get my attention even minimized" behavior the in-app
+// banner can't provide on its own (a minimized window renders nothing
+// visible). Paired 1:1 with the ring starting/stopping in preload.js.
+ipcMain.on("flash-start", () => {
+  mainWindow?.flashFrame(true);
+});
+ipcMain.on("flash-stop", () => {
+  mainWindow?.flashFrame(false);
 });
 
 ipcMain.handle("app-version", () => app.getVersion());

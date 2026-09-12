@@ -29,11 +29,13 @@ contextBridge.exposeInMainWorld("wellnessLodge", {
     audio.play().catch(() => {});
   },
   startAlertLoop: () => {
+    ipcRenderer.send("flash-start");
     if (alertLoopTimer) return; // already ringing -- idempotent
     ringOnce();
     alertLoopTimer = setInterval(ringOnce, 2500);
   },
   stopAlertLoop: () => {
+    ipcRenderer.send("flash-stop");
     if (alertLoopTimer) {
       clearInterval(alertLoopTimer);
       alertLoopTimer = null;
