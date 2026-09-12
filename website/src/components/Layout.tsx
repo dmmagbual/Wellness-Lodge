@@ -70,9 +70,25 @@ export default function Layout() {
   const year = new Date().getFullYear();
   const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  // "solid" = fully opaque header. False only while actively scrolling DOWN
+  // past the top — scrolling up, sitting at the top, or hovering the header
+  // (see the hover: class below) all bring it back to solid.
+  const [solid, setSolid] = useState(true);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 24);
+      if (y <= 24) {
+        setSolid(true);
+      } else if (y > lastY + 4) {
+        setSolid(false);
+      } else if (y < lastY - 4) {
+        setSolid(true);
+      }
+      lastY = y;
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -87,9 +103,9 @@ export default function Layout() {
         Skip to content
       </a>
       <header
-        className={`sticky top-0 z-20 border-b bg-white/95 backdrop-blur transition-all duration-300 ${
+        className={`sticky top-0 z-20 border-b backdrop-blur transition-all duration-300 ${
           scrolled ? "border-stone-200 shadow-sm" : "border-transparent"
-        }`}
+        } ${solid ? "bg-white/95" : "bg-white/50 hover:bg-white/95"}`}
       >
         <div
           className={`mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 transition-[padding] duration-300 ${

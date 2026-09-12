@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** Counts up from 0 to `value` once it scrolls into view. */
 export function StatCounter({
@@ -6,11 +6,13 @@ export function StatCounter({
   suffix = "",
   prefix = "",
   label,
+  icon,
 }: {
   value: number;
   suffix?: string;
   prefix?: string;
   label: string;
+  icon?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [n, setN] = useState(0);
@@ -45,6 +47,11 @@ export function StatCounter({
 
   return (
     <div ref={ref} className="text-center">
+      {icon && (
+        <span className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+          {icon}
+        </span>
+      )}
       <p className="font-serif text-3xl font-bold text-white md:text-4xl">
         {prefix}
         {n.toLocaleString()}
